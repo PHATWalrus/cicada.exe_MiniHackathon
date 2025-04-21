@@ -57,4 +57,12 @@ foreach ($migrationFiles as $file) {
     echo "Migration completed.\n";
 }
 
+// Manually include the email verification columns migration
+// since it may not be picked up by the glob if saved in a different location
+require_once __DIR__ . '/migrations/add_email_verification_columns.php';
+$emailVerificationMigration = new AddEmailVerificationColumns();
+echo "Running migration: AddEmailVerificationColumns...\n";
+$emailVerificationMigration->up();
+echo "Migration completed.\n";
+
 echo "Database setup completed successfully!\n"; 

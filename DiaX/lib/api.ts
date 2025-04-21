@@ -759,3 +759,78 @@ export async function resetPassword(token: string, password: string, password_co
     throw error
   }
 }
+
+// Verify email with token
+export async function verifyEmail(token: string) {
+  try {
+    const response = await fetchWithTimeout(
+      "https://diax.fileish.com/api/auth/verify-email",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      },
+      10000,
+    )
+
+    const data = await handleResponse(response)
+
+    // Update user data in localStorage with verified status
+    if (data && data.user) {
+      // Update the entire user object from the response
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          ...data.user,
+          email_verified: true, // Explicitly ensure this is set to true
+        }),
+      )
+
+      console.log("User verification status updated in localStorage")
+
+      // Update token if provided
+      if (data.token) {
+        localStorage.setItem("token", data.token)
+        console.log("New token stored after verification")
+      }
+    } else {
+      // If no user data in response, still try to update the stored user
+      const storedUser = localStorage.getItem("user")
+      if (storedUser) {
+        const user = JSON.parse(storedUser)
+        user.email_verified = true
+        localStorage.setItem("user", JSON.stringify(user))
+        console.log("Updated existing user with verification status")
+      }
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error verifying email:", error)
+    throw error
+  }
+}
+
+// Resend verification email
+export async function resendVerification(email: string) {
+  try {
+    const response = await fetchWithTimeout(
+      "https://diax.fileish.com/api/auth/resend-verification",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      },
+      10000,
+    )
+
+    return handleResponse(response)
+  } catch (error) {
+    console.error("Error resending verification:", error)
+    throw error
+  }
+}

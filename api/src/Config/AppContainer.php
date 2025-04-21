@@ -70,15 +70,15 @@ class AppContainer
                     'model' => $_ENV['PERPLEXITY_MODEL'],
                 ],
                 'email' => [
-                    'provider' => $_ENV['MAIL_PROVIDER'] ?? 'smtp', // Options: smtp, sendgrid, mailgun, php_mail
-                    'from_name' => $_ENV['MAIL_FROM_NAME'] ?? 'DiaX',
-                    'from_email' => $_ENV['MAIL_FROM_EMAIL'] ?? 'noreply@diax.app',
+                    'provider' => $_ENV['EMAIL_PROVIDER'] ?? $_ENV['MAIL_PROVIDER'] ?? 'php_mail', // Options: smtp, sendgrid, mailgun, php_mail
+                    'from_name' => $_ENV['EMAIL_FROM_NAME'] ?? $_ENV['MAIL_FROM_NAME'] ?? 'DiaX',
+                    'from_email' => $_ENV['EMAIL_FROM_ADDRESS'] ?? $_ENV['MAIL_FROM_EMAIL'] ?? 'noreply@diax.cc',
                     'environment' => $_ENV['APP_ENV'] ?? 'production',
-                    'app_name' => 'DiaX',
+                    'app_name' => $_ENV['APP_NAME'] ?? 'DiaX',
                     'frontend_url' => $_ENV['FRONTEND_URL'] ?? 'https://diax.fileish.com',
                     // Additional email settings
-                    'cc_email' => $_ENV['MAIL_CC_EMAIL'] ?? '',
-                    'bcc_email' => $_ENV['MAIL_BCC_EMAIL'] ?? '',
+                    'cc_email' => $_ENV['EMAIL_CC'] ?? $_ENV['MAIL_CC_EMAIL'] ?? '',
+                    'bcc_email' => $_ENV['EMAIL_BCC'] ?? $_ENV['MAIL_BCC_EMAIL'] ?? '',
                     // SendGrid specific settings
                     'sendgrid_api_key' => $_ENV['SENDGRID_API_KEY'] ?? '',
                     // Mailgun specific settings
@@ -90,6 +90,8 @@ class AppContainer
                     'smtp_username' => $_ENV['SMTP_USERNAME'] ?? '',
                     'smtp_password' => $_ENV['SMTP_PASSWORD'] ?? '',
                     'smtp_encryption' => $_ENV['SMTP_ENCRYPTION'] ?? '', // tls or ssl
+                    // Logo URL for emails
+                    'logo_url' => $_ENV['EMAIL_LOGO_URL'] ?? '',
                 ],
             ],
         ];

@@ -22,6 +22,8 @@ class User extends Model
         'gender',
         'email_verified_at',
         'google_id',
+        'verification_token',
+        'verification_token_expires_at',
     ];
 
     /**
@@ -33,6 +35,8 @@ class User extends Model
         'password',
         'reset_token',
         'reset_token_expires_at',
+        'verification_token',
+        'verification_token_expires_at',
     ];
 
     /**
@@ -43,6 +47,7 @@ class User extends Model
     protected $casts = [
         'email_verified_at' => 'datetime',
         'date_of_birth' => 'date',
+        'verification_token_expires_at' => 'datetime',
     ];
 
     /**
@@ -83,5 +88,46 @@ class User extends Model
     public function verifyPassword(string $password): bool
     {
         return password_verify($password, $this->password);
+    }
+
+    /**
+     * Check if the user's email is verified
+     */
+    public function isEmailVerified(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
+
+    /**
+     * Mark the user's email as verified
+     */
+    public function markEmailAsVerified(): void
+    {
+        $this->email_verified_at = now();
+        $this->verification_token = null;
+        $this->verification_token_expires_at = null;
+        $this->save();
+    }
+
+    /**
+     * Generate verification token for the user
+     */
+    public function generateVerificationToken(): string
+    {
+        $this->verification_token = bin2hex(random_bytes(32));
+        $this->verification_token_expires_at = now()->addHours(24);
+        $this->save();
+        
+        return $this->verification_token;
+    }
+
+    /**
+     * Check if the verification token is valid
+     */
+    public function isVerificationTokenValid(string $token): bool
+    {
+        return $this->verification_token === $token && 
+               $this->verification_token_expires_at !== null && 
+               $this->verification_token_expires_at->isFuture();
     }
 } 

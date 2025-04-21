@@ -39,6 +39,7 @@ class UserController
             'date_of_birth' => $user->date_of_birth ? $user->date_of_birth->format('Y-m-d') : null,
             'gender' => $user->gender,
             'created_at' => $user->created_at->format('Y-m-d H:i:s'),
+            'email_verified_at' => $user->email_verified_at ? $user->email_verified_at->format('Y-m-d H:i:s') : null,
             'has_medical_profile' => $user->medicalProfile()->exists()
         ];
         

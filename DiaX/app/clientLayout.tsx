@@ -5,6 +5,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/context/auth-context"
+import { ThemeContextProvider } from "@/context/theme-context"
 import { useEffect } from "react"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -39,7 +40,9 @@ export default function ClientLayout({
     <html lang="en" suppressHydrationWarning className="w-full h-full">
       <body className={`${inter.className} w-full h-full`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <AuthProvider>{children}</AuthProvider>
+          <ThemeContextProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ThemeContextProvider>
         </ThemeProvider>
       </body>
     </html>

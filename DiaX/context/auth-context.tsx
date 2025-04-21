@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 import { refreshToken } from "@/lib/api"
 import { cacheManager } from "@/lib/cache-manager"
 import { toastService } from "@/lib/toast-service"
+import { useRouter, usePathname } from "next/navigation"
 
 // Debug mode flag
 const DEBUG_AUTH = true
@@ -12,21 +13,38 @@ type User = {
   id: number
   name: string
   email: string
+  email_verified?: boolean
 }
 
 type AuthContextType = {
   user: User | null
   isLoading: boolean
+  isVerified: boolean
   login: (email: string, password: string) => Promise<void>
   register: (userData: any) => Promise<void>
   logout: () => void
+  refreshUserState: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Protected routes that require email verification
+const PROTECTED_ROUTES = [
+  "/dashboard",
+  "/dashboard/health",
+  "/dashboard/chat",
+  "/dashboard/resources",
+  "/dashboard/profile",
+]
+
+// Routes that are allowed even without verification
+const ALLOWED_UNVERIFIED_ROUTES = ["/verify-email", "/check-your-email", "/setup-medical-profile"]
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+  const pathname = usePathname()
 
   // Debug logger function
   const logDebug = (message: string) => {
@@ -34,6 +52,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log(`[AUTH DEBUG] ${message}`)
     }
   }
+
+  // Check if user is verified
+  const isVerified = user?.email_verified === true
+
+  // Check if current route requires verification
+  useEffect(() => {
+    if (!isLoading && user && pathname) {
+      // Only redirect if user is not verified
+      if (!isVerified) {
+        // Check if the current route is protected and not in allowed unverified routes
+        const isProtectedRoute = PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
+        const isAllowedUnverified = ALLOWED_UNVERIFIED_ROUTES.some((route) => pathname.startsWith(route))
+
+        if (isProtectedRoute && !isAllowedUnverified) {
+          logDebug(`Redirecting unverified user from protected route: ${pathname}`)
+          router.push(`/check-your-email?email=${encodeURIComponent(user.email)}`)
+        }
+      } else {
+        logDebug(`User is verified, no redirection needed for: ${pathname}`)
+      }
+    }
+  }, [isLoading, user, isVerified, pathname, router])
 
   useEffect(() => {
     // Check if user is logged in on initial load
@@ -165,6 +205,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Show success toast
       toastService.loginSuccess(data.data.user.name)
+
+      // Check email verification status and redirect accordingly
+      if (data.data.user.email_verified === true) {
+        // User is verified, redirect directly to dashboard
+        logDebug(`User ${data.data.user.email} is verified, redirecting to dashboard`)
+        router.push("/dashboard")
+      } else {
+        // User is not verified, redirect to verification page
+        logDebug(`User ${data.data.user.email} is not verified, redirecting to verification page`)
+        router.push(`/check-your-email?email=${encodeURIComponent(data.data.user.email)}`)
+      }
     } catch (error) {
       console.error("Login error:", error)
       logDebug(`Login error: ${error instanceof Error ? error.message : String(error)}`)
@@ -226,6 +277,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Show success toast
       toastService.registrationSuccess(data.data.user.name)
+
+      // Redirect to check email page
+      router.push(`/check-your-email?email=${encodeURIComponent(userData.email)}`)
+
+      return data
     } catch (error) {
       console.error("Registration error:", error)
       logDebug(`Registration error: ${error instanceof Error ? error.message : String(error)}`)
@@ -270,7 +326,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
   }
 
-  return <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>{children}</AuthContext.Provider>
+  // Add this function to refresh user state from localStorage
+  const refreshUserState = () => {
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser)
+        setUser(parsedUser)
+        logDebug(`User state refreshed from localStorage: ${parsedUser.email}, verified: ${parsedUser.email_verified}`)
+      } catch (error) {
+        logDebug(`Error parsing stored user during refresh: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  }
+
+  // Add an effect to periodically check for user state changes in localStorage
+  useEffect(() => {
+    // Check localStorage every 5 seconds for changes to user verification status
+    const checkInterval = setInterval(() => {
+      if (user) {
+        const storedUser = localStorage.getItem("user")
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser)
+            // If verification status changed, update the user state
+            if (parsedUser.email_verified !== user.email_verified) {
+              logDebug(`Verification status changed in localStorage, updating user state`)
+              setUser(parsedUser)
+            }
+          } catch (error) {
+            logDebug(`Error checking stored user: ${error instanceof Error ? error.message : String(error)}`)
+          }
+        }
+      }
+    }, 5000)
+
+    return () => clearInterval(checkInterval)
+  }, [user])
+
+  // Also expose the refreshUserState function in the context value
+  return (
+    <AuthContext.Provider value={{ user, isLoading, isVerified, login, register, logout, refreshUserState }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

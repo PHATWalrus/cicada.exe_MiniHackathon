@@ -534,28 +534,53 @@ class ChatbotService
         $systemPrompt = "You are DiaX, a specialized diabetes support chatbot created by diaX.fileish.com. ";
         $systemPrompt .= "Your purpose is to provide personalized assistance, evidence-based information, and emotional support to people managing diabetes. ";
         
-        $systemPrompt .= "\nGUIDELINES:";
+        $systemPrompt .= "\nCORE PRINCIPLES:";
         $systemPrompt .= "\n1. Be compassionate, supportive, and empathetic in all responses.";
         $systemPrompt .= "\n2. Provide accurate, evidence-based information about diabetes management, nutrition, medication, and complications.";
-        $systemPrompt .= "\n3. Personalize responses based on the user's specific type of diabetes and medical context when available.";
-        $systemPrompt .= "\n4. If the user is greeting you (saying hello, hi, etc.), respond warmly and ask how you can help with their diabetes management.";
+        $systemPrompt .= "\n3. Personalize all responses based on the user's specific data, medical context, and conversation history.";
+        $systemPrompt .= "\n4. Maintain continuity across conversations by referencing previous discussions when relevant.";
         $systemPrompt .= "\n5. Always include a clear disclaimer to consult healthcare professionals for medical advice when appropriate.";
-        $systemPrompt .= "\n6. Use clear, concise language that is accessible to people with various levels of medical knowledge.";
-        $systemPrompt .= "\n7. When answering questions about diet, exercise, or medication, be specific and practical.";
-        $systemPrompt .= "\n8. If you cannot provide a confident answer, acknowledge limitations rather than giving potentially harmful information.";
-        $systemPrompt .= "\n9. When relevant, mention the importance of regular blood sugar monitoring, A1C testing, and medical check-ups.";
-        $systemPrompt .= "\n10. Actively reference the user's health metrics when relevant to provide personalized context to answers.";
+        
+        $systemPrompt .= "\nRESPONSE GUIDELINES:";
+        $systemPrompt .= "\n1. Use clear, concise language that is accessible to people with various levels of medical knowledge.";
+        $systemPrompt .= "\n2. When answering questions about diet, exercise, or medication, be specific and practical, tailoring recommendations to the user's diabetes type and health status.";
+        $systemPrompt .= "\n3. If you notice concerning trends in the user's health metrics (e.g., consistently high blood glucose), acknowledge them and suggest appropriate actions.";
+        $systemPrompt .= "\n4. When discussing health metrics, compare current values to the user's target ranges and previous readings to provide context.";
+        $systemPrompt .= "\n5. If you cannot provide a confident answer, acknowledge limitations rather than giving potentially harmful information.";
+        $systemPrompt .= "\n6. When relevant, mention the importance of regular blood sugar monitoring, A1C testing, and medical check-ups.";
+        $systemPrompt .= "\n7. Reference the user's specific medications, allergies, and comorbidities when providing advice about treatments or lifestyle changes.";
+        $systemPrompt .= "\n8. If the user mentions symptoms or complications, acknowledge their experience and provide targeted information.";
+        $systemPrompt .= "\n9. Base your responses on the most recent and reliable diabetes management guidelines and research.";
+        $systemPrompt .= "\n10. When referencing health metrics, connect them to potential lifestyle factors or behavioral patterns that may be influencing them.";
         
         // Add user medical context if available
         if ($medicalContext) {
             $systemPrompt .= "\n\nUSER MEDICAL CONTEXT:";
             
             if (!empty($medicalContext['diabetes_type'])) {
-                $systemPrompt .= "\n- Diabetes Type: {$medicalContext['diabetes_type']}";
+                $diabetesType = $medicalContext['diabetes_type'];
+                $systemPrompt .= "\n- Diabetes Type: {$diabetesType}";
+                
+                // Add type-specific considerations
+                switch ($diabetesType) {
+                    case 'type1':
+                        $systemPrompt .= "\n  * Type 1 considerations: Insulin dependency, risk of DKA, carb counting importance, technology management (pumps/CGMs if mentioned)";
+                        break;
+                    case 'type2':
+                        $systemPrompt .= "\n  * Type 2 considerations: Insulin resistance, lifestyle modification importance, progressive condition, medication management";
+                        break;
+                    case 'gestational':
+                        $systemPrompt .= "\n  * Gestational considerations: Temporary condition, fetal health impacts, postpartum follow-up importance, future T2D risk";
+                        break;
+                    case 'prediabetes':
+                        $systemPrompt .= "\n  * Prediabetes considerations: Prevention focus, lifestyle changes can reverse condition, regular screening importance";
+                        break;
+                }
             }
             
             if (!empty($medicalContext['diagnosis_year'])) {
-                $systemPrompt .= "\n- Diagnosed in: {$medicalContext['diagnosis_year']}";
+                $yearsSinceDiagnosis = date('Y') - $medicalContext['diagnosis_year'];
+                $systemPrompt .= "\n- Diagnosed in: {$medicalContext['diagnosis_year']} ({$yearsSinceDiagnosis} years ago)";
             }
             
             if (!empty($medicalContext['height_cm']) && !empty($medicalContext['weight_kg'])) {
@@ -564,23 +589,34 @@ class ChatbotService
             }
             
             if (!empty($medicalContext['bmi'])) {
-                $systemPrompt .= "\n- BMI: {$medicalContext['bmi']}";
+                $bmi = $medicalContext['bmi'];
+                $bmiCategory = "";
+                if ($bmi < 18.5) $bmiCategory = "underweight";
+                else if ($bmi < 25) $bmiCategory = "normal weight";
+                else if ($bmi < 30) $bmiCategory = "overweight";
+                else $bmiCategory = "obese";
+                
+                $systemPrompt .= "\n- BMI: {$bmi} ({$bmiCategory})";
             }
             
             if (!empty($medicalContext['target_glucose_min']) && !empty($medicalContext['target_glucose_max'])) {
                 $systemPrompt .= "\n- Target glucose range: {$medicalContext['target_glucose_min']} - {$medicalContext['target_glucose_max']} mg/dL";
+                $systemPrompt .= "\n  * Use these personalized targets when discussing blood glucose values";
             }
             
             if (!empty($medicalContext['medications'])) {
                 $systemPrompt .= "\n- Medications: {$medicalContext['medications']}";
+                $systemPrompt .= "\n  * Consider these medications when discussing treatment, side effects, or drug interactions";
             }
             
             if (!empty($medicalContext['allergies'])) {
                 $systemPrompt .= "\n- Allergies: {$medicalContext['allergies']}";
+                $systemPrompt .= "\n  * Consider these allergies when discussing foods, medications, or treatments";
             }
             
             if (!empty($medicalContext['comorbidities'])) {
                 $systemPrompt .= "\n- Comorbidities: {$medicalContext['comorbidities']}";
+                $systemPrompt .= "\n  * Consider these conditions when discussing overall health management, exercise, and nutrition";
             }
             
             // Add health metrics if available
@@ -590,23 +626,77 @@ class ChatbotService
                 
                 // Add blood glucose readings
                 if (!empty($healthMetrics['blood_glucose'])) {
-                    $systemPrompt .= "\n- Recent Blood Glucose Readings:";
-                    foreach ($healthMetrics['blood_glucose'] as $index => $reading) {
+                    $readings = $healthMetrics['blood_glucose'];
+                    $avgGlucose = array_reduce($readings, function($carry, $item) {
+                        return $carry + $item['value'];
+                    }, 0) / count($readings);
+                    
+                    $systemPrompt .= "\n- Recent Blood Glucose Readings (average: " . round($avgGlucose, 1) . " mg/dL):";
+                    
+                    // Check if values are in target range
+                    $minTarget = $medicalContext['target_glucose_min'] ?? 70;
+                    $maxTarget = $medicalContext['target_glucose_max'] ?? 130;
+                    
+                    $inRangeCount = 0;
+                    foreach ($readings as $reading) {
+                        if ($reading['value'] >= $minTarget && $reading['value'] <= $maxTarget) {
+                            $inRangeCount++;
+                        }
+                    }
+                    
+                    $inRangePercentage = round(($inRangeCount / count($readings)) * 100);
+                    $systemPrompt .= " {$inRangePercentage}% within target range";
+                    
+                    foreach ($readings as $index => $reading) {
                         $context = !empty($reading['context']) ? " ({$reading['context']})" : "";
-                        $systemPrompt .= "\n  * {$reading['value']} mg/dL on {$reading['date']}{$context}";
+                        $rangeStatus = "";
+                        if ($reading['value'] < $minTarget) {
+                            $rangeStatus = " - below target";
+                        } else if ($reading['value'] > $maxTarget) {
+                            $rangeStatus = " - above target";
+                        } else {
+                            $rangeStatus = " - within target";
+                        }
+                        $systemPrompt .= "\n  * {$reading['value']} mg/dL on {$reading['date']}{$context}{$rangeStatus}";
                     }
                 }
                 
                 // Add blood pressure
                 if (!empty($healthMetrics['blood_pressure'])) {
                     $bp = $healthMetrics['blood_pressure'];
-                    $systemPrompt .= "\n- Blood Pressure: {$bp['systolic']}/{$bp['diastolic']} mmHg (as of {$bp['date']})";
+                    $bpCategory = "";
+                    
+                    // Classify BP according to guidelines
+                    if ($bp['systolic'] < 120 && $bp['diastolic'] < 80) {
+                        $bpCategory = "normal";
+                    } else if ($bp['systolic'] < 130 && $bp['diastolic'] < 80) {
+                        $bpCategory = "elevated";
+                    } else if (($bp['systolic'] >= 130 && $bp['systolic'] < 140) || ($bp['diastolic'] >= 80 && $bp['diastolic'] < 90)) {
+                        $bpCategory = "Stage 1 hypertension";
+                    } else if ($bp['systolic'] >= 140 || $bp['diastolic'] >= 90) {
+                        $bpCategory = "Stage 2 hypertension";
+                    }
+                    
+                    $systemPrompt .= "\n- Blood Pressure: {$bp['systolic']}/{$bp['diastolic']} mmHg (as of {$bp['date']}) - {$bpCategory}";
                 }
                 
                 // Add A1C
                 if (!empty($healthMetrics['a1c'])) {
                     $a1c = $healthMetrics['a1c'];
-                    $systemPrompt .= "\n- A1C: {$a1c['value']}% (as of {$a1c['date']})";
+                    $a1cStatus = "";
+                    
+                    if ($a1c['value'] < 5.7) {
+                        $a1cStatus = "normal";
+                    } else if ($a1c['value'] < 6.5) {
+                        $a1cStatus = "prediabetic range";
+                    } else {
+                        $a1cStatus = "diabetic range";
+                    }
+                    
+                    // Estimate average blood glucose
+                    $eAG = round(($a1c['value'] * 28.7) - 46.7);
+                    
+                    $systemPrompt .= "\n- A1C: {$a1c['value']}% (as of {$a1c['date']}) - {$a1cStatus}, estimated average glucose: {$eAG} mg/dL";
                 }
                 
                 // Add weight if different from profile
@@ -615,24 +705,53 @@ class ChatbotService
                      $healthMetrics['weight']['value'] != $medicalContext['weight_kg'])) {
                     $weight = $healthMetrics['weight'];
                     $systemPrompt .= "\n- Current Weight: {$weight['value']} kg (as of {$weight['date']})";
+                    
+                    // Add weight change information if historical values available
+                    if (isset($medicalContext['weight_kg'])) {
+                        $diff = $weight['value'] - $medicalContext['weight_kg'];
+                        $changeDirection = $diff > 0 ? "gained" : "lost";
+                        $absDiff = abs($diff);
+                        
+                        if ($absDiff > 0.5) { // Only mention if change is significant
+                            $systemPrompt .= " - has {$changeDirection} {$absDiff} kg since previous recording";
+                        }
+                    }
                 }
                 
                 // Add heart rate
                 if (!empty($healthMetrics['heart_rate'])) {
                     $hr = $healthMetrics['heart_rate'];
-                    $systemPrompt .= "\n- Heart Rate: {$hr['value']} bpm (as of {$hr['date']})";
+                    $hrCategory = "";
+                    
+                    if ($hr['value'] < 60) {
+                        $hrCategory = "bradycardia";
+                    } else if ($hr['value'] <= 100) {
+                        $hrCategory = "normal range";
+                    } else {
+                        $hrCategory = "tachycardia";
+                    }
+                    
+                    $systemPrompt .= "\n- Heart Rate: {$hr['value']} bpm (as of {$hr['date']}) - {$hrCategory}";
                 }
                 
                 // Add exercise data
                 if (!empty($healthMetrics['exercise'])) {
                     $ex = $healthMetrics['exercise'];
-                    $intensity = isset($ex['intensity']) ? 
-                        ($ex['intensity'] == 1 ? "Low" : ($ex['intensity'] == 2 ? "Moderate" : "High")) : "";
+                    $intensity = "";
+                    if (isset($ex['intensity'])) {
+                        if ($ex['intensity'] == 1) $intensity = "Low";
+                        else if ($ex['intensity'] == 2) $intensity = "Moderate";
+                        else $intensity = "High";
+                    }
+                    
                     $systemPrompt .= "\n- Recent Exercise: {$ex['duration']} minutes of {$ex['type']}";
                     if (!empty($intensity)) {
                         $systemPrompt .= " (Intensity: {$intensity})";
                     }
                     $systemPrompt .= " on {$ex['date']}";
+                    
+                    // Add exercise impact insight
+                    $systemPrompt .= "\n  * Consider how this exercise pattern might impact blood glucose management";
                 }
             }
         }
@@ -640,18 +759,28 @@ class ChatbotService
         // Add relevant resources if available
         if (!empty($relevantResources)) {
             $systemPrompt .= "\n\nRELEVANT RESOURCES:";
+            $systemPrompt .= "\nUse these evidence-based resources to inform your responses to the current query:";
             
-            foreach ($relevantResources as $resource) {
+            foreach ($relevantResources as $index => $resource) {
                 $title = is_array($resource) ? $resource['title'] : $resource->title;
                 $description = is_array($resource) ? $resource['description'] : $resource->description;
-                $systemPrompt .= "\n- {$title}: {$description}";
+                $systemPrompt .= "\n" . ($index + 1) . ". {$title}: {$description}";
                 
                 $url = is_array($resource) ? ($resource['url'] ?? '') : ($resource->url ?? '');
                 if (!empty($url)) {
-                    $systemPrompt .= "\n  Source: {$url}";
+                    $systemPrompt .= "\n   Source: {$url}";
                 }
             }
+            $systemPrompt .= "\nRefer to these resources in your answer when appropriate, providing evidence-based information.";
         }
+        
+        // Add conversation continuity instructions
+        $systemPrompt .= "\n\nCONVERSATION CONTINUITY:";
+        $systemPrompt .= "\n1. Maintain context from previous messages in the conversation.";
+        $systemPrompt .= "\n2. If referring to previous health metrics or information, be specific about when they were mentioned.";
+        $systemPrompt .= "\n3. If the user mentions new symptoms, metrics, or concerns, incorporate them into your understanding of their situation.";
+        $systemPrompt .= "\n4. If the user has mentioned specific goals in previous conversations (e.g., weight loss, better glucose control), reference and reinforce these.";
+        $systemPrompt .= "\n5. Build upon previous explanations rather than repeating the same basic information.";
         
         return $systemPrompt;
     }

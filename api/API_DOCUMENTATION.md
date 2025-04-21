@@ -102,9 +102,10 @@ All API endpoints return JSON responses with the following structure:
 ### User Registration
 
 - **Endpoint:** `POST /auth/register`
-- **Description:** Register a new user and send a welcome email
+- **Description:** Register a new user and send an email verification link
 - **Auth Required:** No
 - **Rate Limit:** 10 requests per 5 minutes
+- **Email:** Sends a verification email to the provided email address with a verification token
 - **Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -131,15 +132,87 @@ All API endpoints return JSON responses with the following structure:
   ```json
   {
     "error": false,
-    "message": "User registered successfully",
+    "message": "User registered successfully. Please check your email to verify your account.",
     "data": {
       "user": {
         "id": 1,
         "name": "John Doe",
-        "email": "john@example.com"
+        "email": "john@example.com",
+        "email_verified": false
       },
       "token": "JWT_TOKEN_HERE"
     }
+  }
+  ```
+
+### Email Verification
+
+- **Endpoint:** `POST /auth/verify-email`
+- **Description:** Verify a user's email address using the token sent via email
+- **Auth Required:** No
+- **Rate Limit:** 10 requests per 5 minutes
+- **Email:** Sends a welcome email upon successful verification
+- **Parameters:**
+  | Parameter | Type | Required | Description |
+  |---|---|---|---|
+  | token | string | Yes | Verification token received via email |
+
+- **Example Request:**
+  ```json
+  {
+    "token": "verification-token-from-email"
+  }
+  ```
+
+- **Success Response:**
+  ```json
+  {
+    "error": false,
+    "message": "Email verified successfully",
+    "data": {
+      "user": {
+        "id": 1,
+        "name": "John Doe",
+        "email": "john@example.com",
+        "email_verified": true
+      },
+      "token": "JWT_TOKEN_HERE"
+    }
+  }
+  ```
+
+- **Error Response (invalid or expired token):**
+  ```json
+  {
+    "error": true,
+    "message": "Invalid or expired verification token"
+  }
+  ```
+
+### Resend Verification Email
+
+- **Endpoint:** `POST /auth/resend-verification`
+- **Description:** Request a new verification email be sent to the user
+- **Auth Required:** No
+- **Rate Limit:** 10 requests per 5 minutes
+- **Email:** Sends a new verification email if the account exists and is not verified
+- **Parameters:**
+  | Parameter | Type | Required | Description |
+  |---|---|---|---|
+  | email | string | Yes | User's email address |
+
+- **Example Request:**
+  ```json
+  {
+    "email": "john@example.com"
+  }
+  ```
+
+- **Response (always returned regardless of whether the email exists or is verified):**
+  ```json
+  {
+    "error": false,
+    "message": "If your email exists in our system and is not yet verified, a new verification email has been sent."
   }
   ```
 
@@ -173,7 +246,8 @@ All API endpoints return JSON responses with the following structure:
       "user": {
         "id": 1,
         "name": "John Doe",
-        "email": "john@example.com"
+        "email": "john@example.com",
+        "email_verified": true
       },
       "token": "JWT_TOKEN_HERE"
     }
@@ -1564,26 +1638,26 @@ The DiaX API implements several security features to protect user data and preve
 
 ## Email System
 
-The DiaX API includes an integrated email system that sends automated emails for various user actions and events.
+The DiaX API includes a comprehensive email system that sends automated transactional emails to users during various interactions with the API.
 
-### Email Functionality
+## Email Functionality
 
-- **Welcome Emails**: Sent when a user registers for an account
+The API sends several types of automated emails:
+
+- **Verification Emails**: Sent when a new user registers to verify their email address
+- **Welcome Emails**: Sent after a user successfully verifies their email
 - **Password Reset Emails**: Sent when a user requests a password reset
 - **Reset Confirmation Emails**: Sent after a successful password reset
 
-### Email Configuration
+## Email Configuration
 
 To configure the email system, add the following environment variables to your `.env` file:
 
 ```
 # Email Settings
-MAIL_PROVIDER=smtp  # Options: smtp, sendgrid, mailgun, php_mail
+MAIL_PROVIDER=smtp
 MAIL_FROM_NAME=DiaX
 MAIL_FROM_EMAIL=noreply@diax.app
-MAIL_CC_EMAIL=  # Optional CC recipient for all emails
-MAIL_BCC_EMAIL=  # Optional BCC recipient for all emails
-FRONTEND_URL=https://diax.fileish.com  # Used for email links
 
 # SendGrid Mail Settings (if using SendGrid)
 SENDGRID_API_KEY=your_sendgrid_api_key
@@ -1595,56 +1669,64 @@ MAILGUN_DOMAIN=your_mailgun_domain.com
 # SMTP Mail Settings (if using SMTP)
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
-SMTP_USERNAME=your_smtp_username
-SMTP_PASSWORD=your_smtp_password
-SMTP_ENCRYPTION=tls  # tls or ssl
+SMTP_USERNAME=your_username
+SMTP_PASSWORD=your_password
+
+# Frontend URL (used for links in emails)
+FRONTEND_URL=https://your-frontend-url.com
 ```
 
 ### Email Providers
 
-The system supports four email delivery methods:
+The system supports multiple email providers:
 
-1. **SMTP** (`MAIL_PROVIDER=smtp`): Uses a configured SMTP server to send emails
-2. **PHP Mail** (`MAIL_PROVIDER=php_mail`): Uses PHP's built-in mail() function - ideal for shared hosting
-3. **SendGrid** (`MAIL_PROVIDER=sendgrid`): Commercial email service with high deliverability
-4. **Mailgun** (`MAIL_PROVIDER=mailgun`): Commercial email service with generous free tier
+1. **SMTP** - Uses a configured mail server
+2. **PHP Mail** - Uses PHP's mail() function
+3. **SendGrid** - Uses the SendGrid API
+4. **Mailgun** - Uses the Mailgun API
 
-The PHP mail() function is optimized for basic email sending on standard hosting environments and requires no additional credentials beyond the FROM settings.
+If a configured provider fails, the system automatically falls back to PHP mail().
 
-### Email Templates
+## Email Templates
 
-The system uses HTML email templates with the following variables:
+Email templates are located in the `templates/emails` directory:
 
-1. **Welcome Email**:
-   - `{{name}}`: User's name
-   - `{{appName}}`: Application name
-   - `{{year}}`: Current year
-   - Contains a link to the dashboard and overview of features
+- `verify_email.html` - Sent after registration for email verification
+- `welcome.html` - Sent after successful email verification
+- `password_reset.html` - Sent when a user requests a password reset
+- `password_reset_confirmation.html` - Sent after a password reset
 
-2. **Password Reset Email**:
-   - `{{resetUrl}}`: Complete URL with token to reset password
-   - `{{token}}`: The reset token
-   - `{{expiryHours}}`: Hours until token expiration
-   - `{{appName}}`: Application name
-   - `{{year}}`: Current year
+### Email Verification Process
 
-3. **Password Reset Confirmation Email**:
-   - `{{loginUrl}}`: URL to the login page
-   - `{{appName}}`: Application name
-   - `{{year}}`: Current year
+1. When a user registers, a secure verification token is generated and stored as a hash in the database
+2. A verification email is sent containing a link with this token
+3. The link directs the user to the frontend, which then calls the API's verification endpoint
+4. When verified, the user's account is marked as verified and a welcome email is sent
 
-### Development Mode
+### Template Variables
 
-In development mode, emails are not sent but instead:
-- Logged to the server console
-- Saved as HTML files in the `logs/emails` directory
-- Password reset tokens are logged to the console
+Each email template supports variables that are replaced at runtime:
 
-### Email Security
+- **Verification Email**: `{{name}}`, `{{verification_url}}`, `{{current_year}}`, `{{appName}}`
+- **Welcome Email**: `{{name}}`, `{{appName}}`, `{{year}}`
+- **Password Reset**: `{{resetUrl}}`, `{{token}}`, `{{expiryHours}}`, `{{appName}}`, `{{year}}`
+- **Reset Confirmation**: `{{loginUrl}}`, `{{appName}}`, `{{year}}`
 
-The email system implements several security features:
-- Password reset tokens are cryptographically secure random values
-- Tokens are stored as hashed values in the database
-- Tokens expire after 1 hour
-- Generic responses for forgot password to prevent user enumeration
-- Only one valid reset token per user at a time
+## Development Mode
+
+When running in development mode (`APP_ENV=development`), emails aren't actually sent but are:
+
+1. Logged to the console
+2. Saved as HTML files in the `logs/emails` directory
+
+This simplifies testing without sending actual emails during development.
+
+## Security Features
+
+The email system includes several security features:
+
+- **Secure Tokens**: Both email verification and password reset use cryptographically secure tokens
+- **Token Hashing**: Only hashed versions of tokens are stored in the database
+- **Token Expiration**: Verification tokens expire after 24 hours, reset tokens after 1 hour
+- **Anti-Enumeration**: Generic response messages prevent user email enumeration
+- **Spam Prevention**: Email templates follow best practices for deliverability

@@ -24,6 +24,8 @@ $app->group('/api', function (RouteCollectorProxy $group) use ($authRateLimiter)
         $group->post('/refresh', [AuthController::class, 'refresh']);
         $group->post('/forgot-password', [AuthController::class, 'forgotPassword']);
         $group->post('/reset-password', [AuthController::class, 'resetPassword']);
+        $group->post('/verify-email', [AuthController::class, 'verifyEmail']);
+        $group->post('/resend-verification', [AuthController::class, 'resendVerification']);
     })->add($authRateLimiter); // Apply stricter rate limiting to auth endpoints
 
     // Resources (public)

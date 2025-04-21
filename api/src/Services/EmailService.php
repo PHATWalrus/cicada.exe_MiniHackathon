@@ -41,6 +41,33 @@ class EmailService
     }
 
     /**
+     * Send an email verification email with a verification token
+     *
+     * @param string $email The recipient email address
+     * @param string $name The recipient name
+     * @param string $token The verification token
+     * @return bool Whether the email was sent successfully
+     */
+    public function sendEmailVerification(string $email, string $name, string $token): bool
+    {
+        $subject = "Verify Your Email Address";
+        $verificationUrl = ($this->settings['frontend_url'] ?? '') . "/verify-email?token=" . $token;
+        
+        // Add a simple parameter to reduce spam filtering
+        $verificationUrl .= "&source=email";
+        
+        $body = $this->renderTemplate('verify_email', [
+            'name' => $name,
+            'verification_url' => $verificationUrl,
+            'logo_url' => ($this->settings['logo_url'] ?? ''),
+            'current_year' => date('Y'),
+            'appName' => $this->settings['app_name'] ?? 'DiaX'
+        ]);
+
+        return $this->sendEmail($email, $subject, $body);
+    }
+
+    /**
      * Send a password reset email with a reset token
      *
      * @param string $email The recipient email address
@@ -83,9 +110,8 @@ class EmailService
             'appName' => $this->settings['app_name'] ?? 'DiaX',
             'year' => date('Y')
         ]);
-
         // Add a note about checking spam folder at the top of the email
-        $body = str_replace(search: '<body', '<body><div style="background-color: #fffaf0; padding: 10px; margin-bottom: 15px; border: 1px solid #ffa500; border-radius: 5px;">If you\'re having trouble viewing this email, please check your spam folder and mark our emails as "not spam".</div>' . substr($body, strpos($body, '<body') + 6), $body);
+        $body = str_replace('<body', '<body><div style="background-color: #fffaf0; padding: 10px; margin-bottom: 15px; border: 1px solid #ffa500; border-radius: 5px;">If you\'re having trouble viewing this email, please check your spam folder and mark our emails as "not spam".</div>' . substr($body, strpos($body, '<body') + 6), $body);
 
         return $this->sendEmail($email, $subject, $body);
     }
@@ -439,6 +465,39 @@ class EmailService
                 </body>
                 </html>';
                 
+            case 'verify_email':
+                return '
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="x-apple-disable-message-reformatting">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>Verify Your Email Address</title>
+                </head>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h1 style="color: #4a86e8;">' . $appName . '</h1>
+                    </div>
+                    <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px;">
+                        <h2>Please Verify Your Email Address</h2>
+                        <p>Hi {{name}},</p>
+                        <p>Thank you for creating an account with ' . $appName . '. To complete your registration and access all features, please verify your email address.</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="{{verification_url}}" style="background-color: #4a86e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Verify Email Address</a>
+                        </div>
+                        <p>If the button above doesn\'t work, you can copy this link into your browser:</p>
+                        <p style="background-color: #eee; padding: 10px; word-break: break-all;">{{verification_url}}</p>
+                        <p><strong>Note:</strong> This link will be active for 24 hours only.</p>
+                        <p>If you didn\'t create an account on ' . $appName . ', you can safely ignore this email.</p>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #777;">
+                        <p>&copy; ' . $year . ' ' . $appName . ' - This is an automated service message</p>
+                        <p>Please add our email address to your contacts to ensure delivery of important messages.</p>
+                    </div>
+                </body>
+                </html>';
+
             case 'welcome':
                 return '
                 <!DOCTYPE html>

@@ -71,7 +71,7 @@ export default function HealthHistory() {
 
   useEffect(() => {
     loadMetrics()
-  }, [metricType, currentPage, dateRange])
+  }, [metricType, currentPage, dateRange, searchQuery])
 
   const loadMetrics = async () => {
     try {
@@ -94,19 +94,30 @@ export default function HealthHistory() {
         params.to = dateRange.to
       }
 
+      if (searchQuery) {
+        params.search = searchQuery
+      }
+
+      console.log("Fetching metrics with params:", params)
       const data = await fetchHealthMetrics(params)
 
       if (data && data.metrics) {
         setMetrics(data.metrics)
-        setTotalPages(data.pagination.total_pages)
+        // Ensure totalPages is at least 1
+        setTotalPages(Math.max(data.pagination.total_pages || 1, 1))
 
-        // Adjust current page if it's out of bounds
+        console.log(`Pagination update: currentPage=${currentPage}, totalPages=${data.pagination.total_pages || 1}`)
+
+        // Ensure current page is valid
         if (currentPage > data.pagination.total_pages && data.pagination.total_pages > 0) {
           setCurrentPage(data.pagination.total_pages)
         }
+
+        console.log(`Loaded page ${currentPage} of ${data.pagination.total_pages}`)
       } else {
         setMetrics([])
         setTotalPages(1)
+        console.log("No metrics data returned")
       }
     } catch (error) {
       console.error("Error loading health metrics:", error)
@@ -222,6 +233,116 @@ export default function HealthHistory() {
     }
 
     return null
+  }
+
+  // Function to render pagination buttons
+  const renderPaginationButtons = () => {
+    // Always show pagination controls, even with just one page
+    return (
+      <div className="flex justify-center items-center gap-2 mt-6">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="h-8 w-8"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        {/* Fixed pagination buttons */}
+        <div className="flex items-center gap-1">
+          {(() => {
+            // Create an array to hold the page numbers we want to display
+            const pageButtons = []
+
+            // Always show first page
+            if (currentPage > 3) {
+              pageButtons.push(
+                <Button
+                  key={1}
+                  variant={currentPage === 1 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  className={`h-8 w-8 ${
+                    currentPage === 1 ? "bg-gradient-to-r from-cyan-600 to-teal-600 text-white" : ""
+                  }`}
+                >
+                  1
+                </Button>,
+              )
+
+              // Add ellipsis if needed
+              if (currentPage > 4) {
+                pageButtons.push(
+                  <span key="ellipsis1" className="px-1">
+                    ...
+                  </span>,
+                )
+              }
+            }
+
+            // Calculate the range of pages to show around current page
+            const startPage = Math.max(1, currentPage - 1)
+            const endPage = Math.min(totalPages, currentPage + 1)
+
+            // Add the page numbers around current page
+            for (let i = startPage; i <= endPage; i++) {
+              pageButtons.push(
+                <Button
+                  key={i}
+                  variant={currentPage === i ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(i)}
+                  className={`h-8 w-8 ${
+                    currentPage === i ? "bg-gradient-to-r from-cyan-600 to-teal-600 text-white" : ""
+                  }`}
+                >
+                  {i}
+                </Button>,
+              )
+            }
+
+            // Add ellipsis and last page if needed
+            if (currentPage < totalPages - 2) {
+              if (currentPage < totalPages - 3) {
+                pageButtons.push(
+                  <span key="ellipsis2" className="px-1">
+                    ...
+                  </span>,
+                )
+              }
+
+              pageButtons.push(
+                <Button
+                  key={totalPages}
+                  variant={currentPage === totalPages ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  className={`h-8 w-8 ${
+                    currentPage === totalPages ? "bg-gradient-to-r from-cyan-600 to-teal-600 text-white" : ""
+                  }`}
+                >
+                  {totalPages}
+                </Button>,
+              )
+            }
+
+            return pageButtons
+          })()}
+        </div>
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="h-8 w-8"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -432,34 +553,8 @@ export default function HealthHistory() {
                 </div>
               ))}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-2 mt-6">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 w-8"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-
-                  <span className="text-sm">
-                    Page {currentPage} of {totalPages}
-                  </span>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="h-8 w-8"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              {/* Always show pagination, even with just one page */}
+              {renderPaginationButtons()}
             </div>
           )}
         </CardContent>

@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# Set the base path if app is in a subdirectory
+#RewriteBase /diax/api/public
+
 # Redirect all requests to index.php if not a real file or directory
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

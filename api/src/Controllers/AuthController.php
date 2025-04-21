@@ -71,20 +71,30 @@ class AuthController
             $user->gender = $data['gender'];
         }
         
+        // Generate a verification token
+        $verificationToken = bin2hex(random_bytes(32));
+        $user->verification_token = password_hash($verificationToken, PASSWORD_DEFAULT);
+        $user->verification_token_expires_at = date('Y-m-d H:i:s', time() + 86400); // Token expires in 24 hours
+        
         $user->save();
         
-        // Send welcome email
+        // Send verification email
         try {
             $emailService = $this->container->get(EmailService::class);
-            $emailService->sendWelcomeEmail($user->email, $user->name);
+            $emailService->sendEmailVerification($user->email, $user->name, $verificationToken);
         } catch (\Exception $e) {
             // Log the error but don't prevent registration
             if ($this->container->has('logger')) {
-                $this->container->get('logger')->error('Failed to send welcome email: ' . $e->getMessage());
+                $this->container->get('logger')->error('Failed to send verification email: ' . $e->getMessage());
             }
         }
         
-        // Generate token
+        // For development/testing purposes, you can log the token
+        if ($this->container->get('settings')['app']['env'] === 'development') {
+            error_log("Email verification token for {$user->email}: {$verificationToken}");
+        }
+        
+        // Generate token (even though email is not verified yet, it will have limited permissions)
         $token = JwtUtil::generateToken(
             $user->id,
             $user->email,
@@ -93,18 +103,154 @@ class AuthController
         
         $response->getBody()->write(json_encode([
             'error' => false,
-            'message' => 'User registered successfully',
+            'message' => 'User registered successfully. Please check your email to verify your account.',
             'data' => [
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
-                    'email' => $user->email
+                    'email' => $user->email,
+                    'email_verified' => false
                 ],
                 'token' => $token
             ]
         ]));
         
         return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+    }
+    
+    /**
+     * Verify a user's email address using the verification token
+     */
+    public function verifyEmail(Request $request, Response $response): Response
+    {
+        $data = $request->getParsedBody();
+        
+        // Validate input
+        if (!isset($data['token']) || empty($data['token'])) {
+            $response->getBody()->write(json_encode([
+                'error' => true,
+                'message' => 'Verification token is required'
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+        
+        // Find users with unexpired verification tokens
+        $users = User::whereNotNull('verification_token')
+            ->where('verification_token_expires_at', '>', date('Y-m-d H:i:s'))
+            ->whereNull('email_verified_at')
+            ->get();
+            
+        // Check each user to find the one with the matching token
+        $validUser = null;
+        foreach ($users as $user) {
+            // Since we stored a hash of the token, we need to verify it
+            if (password_verify($data['token'], $user->verification_token)) {
+                $validUser = $user;
+                break;
+            }
+        }
+        
+        if (!$validUser) {
+            $response->getBody()->write(json_encode([
+                'error' => true,
+                'message' => 'Invalid or expired verification token'
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+        
+        // Mark email as verified
+        $validUser->email_verified_at = date('Y-m-d H:i:s');
+        $validUser->verification_token = null;
+        $validUser->verification_token_expires_at = null;
+        $validUser->save();
+        
+        // Send welcome email now that the email is verified
+        try {
+            $emailService = $this->container->get(EmailService::class);
+            $emailService->sendWelcomeEmail($validUser->email, $validUser->name);
+        } catch (\Exception $e) {
+            // Log the error but continue with verification success
+            if ($this->container->has('logger')) {
+                $this->container->get('logger')->error('Failed to send welcome email: ' . $e->getMessage());
+            }
+        }
+        
+        // Generate new token with full permissions
+        $token = JwtUtil::generateToken(
+            $validUser->id,
+            $validUser->email,
+            $this->container->get('settings')['jwt']
+        );
+        
+        $response->getBody()->write(json_encode([
+            'error' => false,
+            'message' => 'Email verified successfully',
+            'data' => [
+                'user' => [
+                    'id' => $validUser->id,
+                    'name' => $validUser->name,
+                    'email' => $validUser->email,
+                    'email_verified' => true
+                ],
+                'token' => $token
+            ]
+        ]));
+        
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+    
+    /**
+     * Resend email verification token
+     */
+    public function resendVerification(Request $request, Response $response): Response
+    {
+        $data = $request->getParsedBody();
+        
+        // Validate input
+        if (!isset($data['email']) || !v::email()->validate($data['email'])) {
+            $response->getBody()->write(json_encode([
+                'error' => true,
+                'message' => 'Valid email is required'
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+        
+        // Find user by email
+        $user = User::where('email', $data['email'])
+            ->whereNull('email_verified_at')
+            ->first();
+            
+        if ($user) {
+            // Generate a new verification token
+            $verificationToken = bin2hex(random_bytes(32));
+            $user->verification_token = password_hash($verificationToken, PASSWORD_DEFAULT);
+            $user->verification_token_expires_at = date('Y-m-d H:i:s', time() + 86400); // Token expires in 24 hours
+            $user->save();
+            
+            // Send verification email
+            try {
+                $emailService = $this->container->get(EmailService::class);
+                $emailService->sendEmailVerification($user->email, $user->name, $verificationToken);
+            } catch (\Exception $e) {
+                // Log the error but don't prevent the response
+                if ($this->container->has('logger')) {
+                    $this->container->get('logger')->error('Failed to send verification email: ' . $e->getMessage());
+                }
+            }
+            
+            // For development/testing purposes, you can log the token
+            if ($this->container->get('settings')['app']['env'] === 'development') {
+                error_log("New email verification token for {$user->email}: {$verificationToken}");
+            }
+        }
+        
+        // Always return a success response to prevent user enumeration
+        $response->getBody()->write(json_encode([
+            'error' => false,
+            'message' => 'If your email exists in our system and is not yet verified, a new verification email has been sent.'
+        ]));
+        
+        return $response->withHeader('Content-Type', 'application/json');
     }
     
     public function login(Request $request, Response $response): Response
@@ -208,7 +354,8 @@ class AuthController
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
-                    'email' => $user->email
+                    'email' => $user->email,
+                    'email_verified' => $user->isEmailVerified()
                 ],
                 'token' => $token
             ]

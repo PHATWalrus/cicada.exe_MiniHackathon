@@ -26,18 +26,27 @@ class CorsMiddleware implements MiddlewareInterface
     
     private function addCorsHeaders(ResponseInterface $response, ServerRequestInterface $request): ResponseInterface
     {
-        // Get allowed origins from environment or use a default
-        $allowedOrigins = $_ENV['CORS_ALLOWED_ORIGINS'] ?? 'https://diax.vercel.app,https://diax.fileish.com,https://diax.cc';
-        $origins = explode(',', $allowedOrigins);
+        // Get allowed origins from environment variable or use a default
+        $allowedOrigins = $_ENV['CORS_ALLOWED_ORIGINS'] ?? '*';
+        $originHeader = $request->getHeaderLine('Origin');
         
-        // Get origin from request
-        $origin = $request->getHeaderLine('Origin');
+        // If specific origins are defined, validate the request origin
+        if ($allowedOrigins !== '*' && !empty($originHeader)) {
+            $allowedOriginsArray = explode(',', $allowedOrigins);
+            $originHeader = in_array($originHeader, $allowedOriginsArray) ? $originHeader : '';
+        }
         
-        // Check if origin is allowed
-        $allowedOrigin = in_array($origin, $origins) ? $origin : $origins[0];
+        // If no valid origin found and we're not allowing all origins, use the first allowed origin
+        if (empty($originHeader) && $allowedOrigins !== '*') {
+            $allowedOriginsArray = explode(',', $allowedOrigins);
+            $originHeader = $allowedOriginsArray[0];
+        }
+        
+        // If allowing all origins or we have a valid origin
+        $origin = ($allowedOrigins === '*') ? '*' : $originHeader;
         
         return $response
-            ->withHeader('Access-Control-Allow-Origin', $allowedOrigin)
+            ->withHeader('Access-Control-Allow-Origin', $origin)
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization, X-Auth-Token')
             ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
             ->withHeader('Access-Control-Allow-Credentials', 'true')
