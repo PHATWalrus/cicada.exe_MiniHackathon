@@ -10,11 +10,7 @@ import {
   Activity,
   Droplet,
   Heart,
-  LucideLineChart,
-  PlusCircle,
   Scale,
-  TrendingUp,
-  Dumbbell,
   ClipboardList,
   Download,
   FileJson,
@@ -33,6 +29,66 @@ import { motion } from "framer-motion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { healthService } from "@/lib/api-services/health-service"
 import { exportAsCSV, exportAsJSON } from "@/lib/export-utils"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const HealthStatsSkeleton = () => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {Array.from({ length: 3 }).map((_, i) => (
+      <Card key={i} className="border border-cyan-500/20 dark:border-cyan-500/10 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="pb-6 bg-gradient-to-r from-cyan-50/80 to-teal-50/80 dark:from-cyan-950/30 dark:to-teal-950/30">
+          <CardTitle className="flex items-center gap-2">
+            <Skeleton className="h-5 w-5 rounded-full" />
+            <Skeleton className="h-5 w-20" />
+          </CardTitle>
+          <CardDescription>
+            <Skeleton className="h-4 w-40" />
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="p-3 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">
+                <Skeleton className="h-3 w-12" />
+              </p>
+              <p className="text-2xl font-semibold">
+                <Skeleton className="h-6 w-16" />
+              </p>
+            </div>
+            <div className="p-3 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">
+                <Skeleton className="h-3 w-12" />
+              </p>
+              <p className="text-2xl font-semibold">
+                <Skeleton className="h-6 w-16" />
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 h-[180px]">
+            <Skeleton className="h-full w-full" />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="p-3 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">
+                <Skeleton className="h-3 w-12" />
+              </p>
+              <p>
+                <Skeleton className="h-4 w-20" />
+              </p>
+            </div>
+            <div className="p-3 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">
+                <Skeleton className="h-3 w-12" />
+              </p>
+              <p>
+                <Skeleton className="h-4 w-20" />
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+)
 
 export default function HealthPage() {
   const [timeframe, setTimeframe] = useState("30")
@@ -677,229 +733,54 @@ export default function HealthPage() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* A1C Card */}
-                {stats.a1c && (
-                  <Card className="border border-cyan-500/20 dark:border-cyan-500/10 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-6 bg-gradient-to-r from-cyan-50/80 to-teal-50/80 dark:from-cyan-950/30 dark:to-teal-950/30">
-                      <CardTitle className="bg-gradient-to-r from-cyan-700 to-teal-700 dark:from-cyan-300 dark:to-teal-300 bg-clip-text text-transparent flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-cyan-500" />
-                        A1C
-                      </CardTitle>
-                      <CardDescription>
-                        {stats.a1c.count} readings in the past {timeframe} days
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gradient-to-r from-cyan-500/5 to-teal-500/5 p-3 rounded-lg">
-                          <p className="text-xs text-muted-foreground mb-1">Last Reading</p>
-                          <p className="text-2xl font-semibold text-cyan-600">{stats.a1c.last}%</p>
-                        </div>
-                        <div className="bg-gradient-to-r from-cyan-500/5 to-teal-500/5 p-3 rounded-lg">
-                          <p className="text-xs text-muted-foreground mb-1">Change</p>
-                          <p
-                            className={`text-2xl font-semibold ${stats.a1c.change < 0 ? "text-green-500" : stats.a1c.change > 0 ? "text-red-500" : "text-muted-foreground"}`}
-                          >
-                            {stats.a1c.change > 0 ? "+" : ""}
-                            {stats.a1c.change}%
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Add chart if we have data points */}
-                      <div className="mt-4 h-[180px]">
-                        <LineChart
-                          data={prepareA1CChartData()}
-                          index="date"
-                          categories={["A1C"]}
-                          colors={["#8b5cf6"]}
-                          valueFormatter={(value) => `${value}%`}
-                          height={180}
-                          showGridLines={true}
-                          isLoading={isRefreshing}
-                          error={apiError}
-                        />
-                      </div>
-
-                      <div className="mt-4">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
-                                <Info className="h-3 w-3" />
-                                <span>What is A1C?</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p>
-                                A1C is a blood test that reflects your average blood glucose levels over the past 2-3
-                                months. It's used to diagnose diabetes and monitor long-term glucose control.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Activity Summary Card */}
-                {stats.exercise && (
-                  <Card className="border border-cyan-500/20 dark:border-cyan-500/10 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-6 bg-gradient-to-r from-cyan-50/80 to-teal-50/80 dark:from-cyan-950/30 dark:to-teal-950/30">
-                      <CardTitle className="bg-gradient-to-r from-cyan-700 to-teal-700 dark:from-cyan-300 dark:to-teal-300 bg-clip-text text-transparent flex items-center gap-2">
-                        <Dumbbell className="h-5 w-5 text-cyan-500" />
-                        Exercise
-                      </CardTitle>
-                      <CardDescription>
-                        {stats.exercise.count} activities in the past {timeframe} days
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gradient-to-r from-cyan-500/5 to-teal-500/5 p-3 rounded-lg">
-                          <p className="text-xs text-muted-foreground mb-1">Total Duration</p>
-                          <p className="text-2xl font-semibold text-cyan-600">
-                            {stats.exercise.total_minutes} <span className="text-sm font-normal">min</span>
-                          </p>
-                        </div>
-                        <div className="bg-gradient-to-r from-cyan-500/5 to-teal-500/5 p-3 rounded-lg">
-                          <p className="text-xs text-muted-foreground mb-1">Avg. Intensity</p>
-                          <p className="text-2xl font-semibold text-cyan-600">{stats.exercise.avg_intensity}/10</p>
-                        </div>
-                      </div>
-
-                      {/* Exercise type distribution */}
-                      {/* <div className="mt-4 h-[180px]">
-                        <DonutChart
-                          data={prepareExerciseTypeData()}
-                          index="name"
-                          category="value"
-                          colors={["#06b6d4", "#0891b2", "#0e7490", "#14b8a6", "#0d9488"]}
-                          valueFormatter={(value) => `${value} sessions`}
-                          height={180}
-                          isLoading={isRefreshing}
-                          error={apiError}
-                        />
-                      </div> */}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Summary Card */}
-                <Card className="border border-cyan-500/20 dark:border-cyan-500/10 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow md:col-span-2 lg:col-span-3">
-                  <CardHeader className="pb-6 bg-gradient-to-r from-cyan-50/80 to-teal-50/80 dark:from-cyan-950/30 dark:to-teal-950/30">
-                    <CardTitle className="bg-gradient-to-r from-cyan-700 to-teal-700 dark:from-cyan-300 dark:to-teal-300 bg-clip-text text-transparent flex items-center gap-2">
-                      <LucideLineChart className="h-5 w-5 text-cyan-500" />
-                      Summary
-                    </CardTitle>
-                    <CardDescription>Overall health tracking for the past {timeframe} days</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 gap-8">
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-gradient-to-r from-cyan-500/5 to-teal-500/5 p-4 rounded-lg">
-                            <p className="text-sm text-muted-foreground mb-2">Tracking Consistency</p>
-                            <p className="text-3xl font-semibold text-cyan-600">
-                              {stats.days_with_entries}/{timeframe} <span className="text-sm font-normal">days</span>
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {Math.round((stats.days_with_entries / Number.parseInt(timeframe)) * 100)}% of days have
-                              entries
-                            </p>
-                          </div>
-
-                          {medicalInfo && (
-                            <div className="bg-gradient-to-r from-cyan-500/5 to-teal-500/5 p-4 rounded-lg">
-                              <p className="text-sm text-muted-foreground mb-2">Target Glucose Range</p>
-                              <p className="text-xl font-semibold text-cyan-600">
-                                {medicalInfo.target_glucose_min} - {medicalInfo.target_glucose_max}{" "}
-                                <span className="text-sm font-normal">mg/dL</span>
-                              </p>
-                              {stats.blood_glucose && (
-                                <p className="text-xs text-muted-foreground mt-2">
-                                  {stats.blood_glucose.in_range_percentage}% of readings within target
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="bg-gradient-to-r from-cyan-500/5 to-teal-500/5 p-4 rounded-lg">
-                            <p className="text-sm text-muted-foreground mb-2">Next Steps</p>
-                            <ul className="text-xs space-y-1 mt-2">
-                              {(!stats.blood_glucose || stats.blood_glucose.count < 3) && (
-                                <li className="flex items-center gap-1">
-                                  <PlusCircle className="h-3 w-3 text-cyan-500" />
-                                  <span>Add more blood glucose readings</span>
-                                </li>
-                              )}
-                              {(!stats.blood_pressure || stats.blood_pressure.count < 3) && (
-                                <li className="flex items-center gap-1">
-                                  <PlusCircle className="h-3 w-3 text-cyan-500" />
-                                  <span>Track your blood pressure</span>
-                                </li>
-                              )}
-                              {(!stats.exercise || stats.exercise.count < 2) && (
-                                <li className="flex items-center gap-1">
-                                  <PlusCircle className="h-3 w-3 text-cyan-500" />
-                                  <span>Log your exercise activities</span>
-                                </li>
-                              )}
-                              {!medicalInfo && (
-                                <li className="flex items-center gap-1">
-                                  <PlusCircle className="h-3 w-3 text-cyan-500" />
-                                  <span>Complete your medical profile</span>
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Last updated timestamp */}
-                    <div className="flex justify-between items-center mt-6">
-                      <p className="text-xs text-muted-foreground">Last updated: {lastUpdated.toLocaleString()}</p>
-                      <Button
-                        variant="outline"
-                        className="text-xs border-cyan-500/30 hover:bg-cyan-500/10"
-                        onClick={handleManualRefresh}
-                        disabled={isRefreshing}
-                      >
-                        <RefreshCw className={`mr-2 h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
-                        {isRefreshing ? "Refreshing..." : "Refresh Data"}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             )}
           </TabsContent>
         </Tabs>
       </motion.div>
+      <motion.div variants={item}>
+        {/* Medical Info Card */}
+        <Card className="border border-cyan-500/20 dark:border-cyan-500/10 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+          <CardHeader className="pb-6 bg-gradient-to-r from-cyan-50/80 to-teal-50/80 dark:from-cyan-950/30 dark:to-teal-950/30">
+            <CardTitle className="bg-gradient-to-r from-cyan-700 to-teal-700 dark:from-cyan-300 dark:to-teal-300 bg-clip-text text-transparent flex items-center gap-2">
+              <Info className="h-5 w-5 text-cyan-500" />
+              Medical Information
+            </CardTitle>
+            <CardDescription>Your recorded medical conditions and medications</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-gray-600 mb-2">Conditions</h4>
+              {conditions.length > 0 ? (
+                <ul className="list-disc list-inside text-sm">
+                  {conditions.map((condition, index) => (
+                    <li key={index}>{condition}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No conditions recorded.</p>
+              )}
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-600 mb-2">Medications</h4>
+              {medications.length > 0 ? (
+                <ul className="list-disc list-inside text-sm">
+                  {medications.map((medication, index) => (
+                    <li key={index}>{medication}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No medications recorded.</p>
+              )}
+            </div>
+            <Link href="/dashboard/profile/medical" onMouseEnter={() => preloadRoute("/dashboard/profile/medical")}>
+              <Button variant="link" className="mt-4">
+                Edit Medical Information
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </motion.div>
     </motion.div>
   )
 }
-
-// Skeleton loader for health stats
-const HealthStatsSkeleton = () => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {[1, 2, 3, 4, 5, 6].map((i) => (
-      <Card key={i} className="border border-border shadow-sm rounded-xl">
-        <CardHeader className="pb-2">
-          <div className="h-5 w-32 bg-muted/60 rounded animate-pulse"></div>
-          <div className="h-4 w-24 bg-muted/40 rounded animate-pulse mt-2"></div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="h-16 w-full bg-muted/40 rounded animate-pulse"></div>
-            <div className="h-16 w-full bg-muted/40 rounded animate-pulse"></div>
-          </div>
-          <div className="h-32 w-full bg-muted/30 rounded animate-pulse"></div>
-        </CardContent>
-      </Card>
-    ))}
-  </div>
-)

@@ -468,11 +468,12 @@ body {
 /* Ensure the dashboard content doesn't scroll unnecessarily */
 @media (min-width: 769px) {
   .dashboard-content {
+    width: 100%;
     height: calc(100vh - 4rem);
     overflow: auto;
     display: flex;
     flex-direction: column;
-    contain: layout size; /* Improve layout performance */
+    contain: layout size;
   }
 
   .dashboard-content > div {
@@ -507,7 +508,8 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: auto; /* Allow scrolling */
+  overflow: auto;
+  width: 100%;
   position: relative;
 }
 
@@ -581,4 +583,150 @@ main {
     height: calc(100vh - 20rem);
     max-height: calc(100vh - 20rem);
   }
+}
+
+/* Add these styles to the end of your globals.css file */
+
+/* Custom toast animations */
+@keyframes toast-slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-in-left {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes toast-slide-out-left {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes toast-bounce {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes toast-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Toast stacking styles */
+[data-radix-toast-viewport] {
+  --viewport-padding: 16px;
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--viewport-padding);
+  gap: 10px;
+  max-width: 100vw;
+  max-height: 100vh;
+  z-index: 2147483647;
+}
+
+[data-radix-toast] {
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0px 10px 38px -10px rgba(22, 23, 24, 0.35), 0px 10px 20px -15px rgba(22, 23, 24, 0.2);
+  padding: 15px;
+  display: grid;
+  grid-template-areas: "title action" "description action";
+  grid-template-columns: auto max-content;
+  column-gap: 15px;
+  align-items: center;
+}
+
+[data-radix-toast][data-state="open"] {
+  animation: toast-slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-radix-toast][data-state="closed"] {
+  animation: toast-slide-out-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-radix-toast][data-swipe="move"] {
+  transform: translateX(var(--radix-toast-swipe-move-x));
+}
+
+[data-radix-toast][data-swipe="cancel"] {
+  transform: translateX(0);
+  transition: transform 0.2s ease-out;
+}
+
+[data-radix-toast][data-swipe="end"] {
+  animation: toast-slide-out-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Toast variants */
+.toast-success {
+  border-left: 4px solid hsl(var(--success));
+}
+
+.toast-error {
+  border-left: 4px solid hsl(var(--destructive));
+}
+
+.toast-warning {
+  border-left: 4px solid hsl(var(--warning));
+}
+
+.toast-info {
+  border-left: 4px solid hsl(var(--info));
 }

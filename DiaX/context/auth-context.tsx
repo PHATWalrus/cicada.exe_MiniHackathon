@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { refreshToken } from "@/lib/api"
 import { cacheManager } from "@/lib/cache-manager"
+import { toastService } from "@/lib/toast-service"
 
 // Debug mode flag
 const DEBUG_AUTH = true
@@ -68,6 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Clear all caches
             cacheManager.clearAllCaches()
             logDebug("User logged out due to token refresh failure")
+
+            // Show session expired toast
+            toastService.sessionExpired()
           } finally {
             setIsLoading(false)
             logDebug("Auth loading completed")
@@ -118,6 +122,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         const errorData = await response.json()
         logDebug(`Login failed with status ${response.status}: ${errorData.message || "Unknown error"}`)
+
+        // Check for account locking
+        if (errorData.message && errorData.message.includes("temporarily locked")) {
+          // Extract minutes from message like "Account is temporarily locked. Please try again in 15 minute(s)."
+          const minutesMatch = errorData.message.match(/(\d+) minute/)
+          const minutes = minutesMatch ? Number.parseInt(minutesMatch[1]) : 15
+
+          toastService.accountLocked(minutes)
+        } else {
+          throw new Error(errorData.message || "Login failed")
+        }
+
         throw new Error(errorData.message || "Login failed")
       }
 
@@ -146,9 +162,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Clear any existing caches to ensure fresh data
       await cacheManager.clearAllCaches()
+
+      // Show success toast
+      toastService.loginSuccess(data.data.user.name)
     } catch (error) {
       console.error("Login error:", error)
       logDebug(`Login error: ${error instanceof Error ? error.message : String(error)}`)
+
+      // Show error toast if not already shown by account locking check
+      if (error instanceof Error && !error.message.includes("temporarily locked")) {
+        toastService.error(
+          "Login Failed",
+          error instanceof Error ? error.message : "Please check your credentials and try again",
+        )
+      }
+
       throw error
     }
   }
@@ -195,9 +223,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Clear any existing caches to ensure fresh data
       await cacheManager.clearAllCaches()
+
+      // Show success toast
+      toastService.registrationSuccess(data.data.user.name)
     } catch (error) {
       console.error("Registration error:", error)
       logDebug(`Registration error: ${error instanceof Error ? error.message : String(error)}`)
+
+      // Show error toast
+      toastService.error(
+        "Registration Failed",
+        error instanceof Error ? error.message : "Please check your information and try again",
+      )
+
       throw error
     }
   }
@@ -212,6 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Clear all caches
     cacheManager.clearAllCaches()
+
+    // Show logout toast
+    toastService.logoutSuccess()
 
     // Call logout API (but don't wait for it)
     fetch("https://diax.fileish.com/api/auth/logout", {
@@ -239,3 +280,5 @@ export function useAuth() {
   }
   return context
 }
+
+export { AuthContext }

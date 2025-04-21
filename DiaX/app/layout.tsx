@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import ClientLayout from "./clientLayout"
+import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
   title: "DiaX - Your Diabetes Management Assistant",
@@ -13,7 +14,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return <ClientLayout>{children}</ClientLayout>
+  return (
+    <>
+      <ClientLayout>{children}</ClientLayout>
+      <Toaster />
+    </>
+  )
 }
 
 

@@ -36,8 +36,8 @@ export default function ClientLayout({
   }, [])
 
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning className="w-full h-full">
+      <body className={`${inter.className} w-full h-full`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>

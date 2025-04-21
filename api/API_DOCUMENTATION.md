@@ -16,15 +16,47 @@ Most endpoints require authentication using JWT (JSON Web Token). Include the to
 Authorization: Bearer YOUR_TOKEN_HERE
 ```
 
+### Token Security
+
+The API implements several security measures for tokens:
+
+- **Token Fingerprinting**: Tokens are bound to the client IP and user agent to prevent token theft
+- **Token Expiration**: Tokens automatically expire after a configured time (default: 1 hour)
+- **Token Revocation**: Tokens are invalidated on logout to prevent reuse
+- **Unique Token IDs**: Each token contains a unique identifier to prevent replay attacks
+
+## Rate Limiting
+
+The API implements rate limiting to protect against abuse:
+
+- **Authentication Endpoints**: 10 requests per 5 minutes
+- **Standard API Endpoints**: 60 requests per minute
+
+When rate limits are exceeded, endpoints return:
+
+```
+Status: 429 Too Many Requests
+```
+
+```json
+{
+  "error": true,
+  "message": "Too many requests. Please try again later.",
+  "retry_after": 300
+}
+```
+
+The `retry_after` value indicates the number of seconds to wait before making another request.
+
 ## CORS Support
 
 This API supports Cross-Origin Resource Sharing (CORS) for cross-domain requests with the following configuration:
 
-- **Allowed Origins:** All domains (`*`)
+- **Allowed Origins:** Specific domains (diax.vercel.app, diax.fileish.com)
 - **Allowed Methods:** GET, POST, PUT, DELETE, OPTIONS
 - **Allowed Headers:** Content-Type, Accept, Authorization, X-Requested-With, Origin
-- **Credentials:** Allowed (supports cookies in cross-origin requests)
-- **Pre-flight Caching:** No caching of pre-flight requests
+- **Credentials:** Allowed (supports cookies in cross-domain requests)
+- **Pre-flight Caching:** 24 hours
 
 Preflight OPTIONS requests are automatically handled by the API's CORS middleware.
 
@@ -70,8 +102,9 @@ All API endpoints return JSON responses with the following structure:
 ### User Registration
 
 - **Endpoint:** `POST /auth/register`
-- **Description:** Register a new user
+- **Description:** Register a new user and send a welcome email
 - **Auth Required:** No
+- **Rate Limit:** 10 requests per 5 minutes
 - **Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -115,6 +148,8 @@ All API endpoints return JSON responses with the following structure:
 - **Endpoint:** `POST /auth/login`
 - **Description:** Authenticate a user and receive an access token
 - **Auth Required:** No
+- **Rate Limit:** 10 requests per 5 minutes
+- **Security:** Account is temporarily locked after multiple failed login attempts
 - **Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -145,11 +180,98 @@ All API endpoints return JSON responses with the following structure:
   }
   ```
 
+- **Account Locking Response (after multiple failed attempts):**
+  ```json
+  {
+    "error": true,
+    "message": "Account is temporarily locked. Please try again in 15 minute(s)."
+  }
+  ```
+
+### Forgot Password
+
+- **Endpoint:** `POST /auth/forgot-password`
+- **Description:** Request a password reset link be sent to the user's email
+- **Auth Required:** No
+- **Rate Limit:** 10 requests per 5 minutes
+- **Email:** Sends a password reset email with a secure token
+- **Parameters:**
+  | Parameter | Type | Required | Description |
+  |---|---|---|---|
+  | email | string | Yes | User's email address |
+
+- **Example Request:**
+  ```json
+  {
+    "email": "john@example.com"
+  }
+  ```
+
+- **Response (always returned regardless of whether the email exists):**
+  ```json
+  {
+    "error": false,
+    "message": "If the email address exists in our system, a password reset link has been sent."
+  }
+  ```
+
+### Reset Password
+
+- **Endpoint:** `POST /auth/reset-password`
+- **Description:** Reset a user's password using a valid reset token
+- **Auth Required:** No
+- **Rate Limit:** 10 requests per 5 minutes
+- **Email:** Sends a confirmation email after successful password reset
+- **Parameters:**
+  | Parameter | Type | Required | Description |
+  |---|---|---|---|
+  | token | string | Yes | Password reset token received via email |
+  | password | string | Yes | New password (min 8 characters) |
+  | password_confirmation | string | Yes | Confirm new password |
+
+- **Example Request:**
+  ```json
+  {
+    "token": "valid-reset-token-from-email",
+    "password": "NewSecurePassword123",
+    "password_confirmation": "NewSecurePassword123"
+  }
+  ```
+
+- **Success Response:**
+  ```json
+  {
+    "error": false,
+    "message": "Password has been reset successfully."
+  }
+  ```
+
+- **Error Response (invalid or expired token):**
+  ```json
+  {
+    "error": true,
+    "message": "Invalid or expired password reset token."
+  }
+  ```
+
+- **Error Response (validation errors):**
+  ```json
+  {
+    "error": true,
+    "message": "Validation failed",
+    "errors": {
+      "password": ["Password must be at least 8 characters."],
+      "password_confirmation": ["Password confirmation does not match."]
+    }
+  }
+  ```
+
 ### Token Refresh
 
 - **Endpoint:** `POST /auth/refresh`
 - **Description:** Get a new token using existing token
 - **Auth Required:** No
+- **Rate Limit:** 10 requests per 5 minutes
 - **Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -212,8 +334,10 @@ All these endpoints require a valid JWT token in the Authorization header.
 ### User Logout
 
 - **Endpoint:** `POST /auth/logout`
-- **Description:** Logout the current user
+- **Description:** Logout the current user and revoke the token
 - **Auth Required:** Yes
+- **Rate Limit:** 10 requests per 5 minutes
+- **Security:** Invalidates the token to prevent reuse after logout
 - **Response:**
   ```json
   {
@@ -227,6 +351,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `GET /users/profile`
 - **Description:** Get the current user's profile information
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **Response:**
   ```json
   {
@@ -249,6 +374,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `PUT /users/profile`
 - **Description:** Update the current user's profile
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -280,6 +406,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `GET /users/medical-info`
 - **Description:** Get the user's medical profile
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **Response:**
   ```json
   {
@@ -308,6 +435,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `POST /users/medical-info`
 - **Description:** Update or create medical information
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -361,6 +489,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `GET /health/metrics`
 - **Description:** Get user's health metrics with optional filtering
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **Query Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -402,6 +531,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `POST /health/metrics`
 - **Description:** Add a new health metric record
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -449,6 +579,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `PUT /health/metrics/{id}`
 - **Description:** Update an existing health metric
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **URL Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -468,6 +599,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `DELETE /health/metrics/{id}`
 - **Description:** Delete a health metric record
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **URL Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -486,6 +618,7 @@ All these endpoints require a valid JWT token in the Authorization header.
 - **Endpoint:** `GET /health/stats`
 - **Description:** Get statistical data about user's health metrics
 - **Auth Required:** Yes
+- **Rate Limit:** 60 requests per minute
 - **Query Parameters:**
   | Parameter | Type | Required | Description |
   |---|---|---|---|
@@ -1382,3 +1515,136 @@ The application handles these requirements automatically, but they may be releva
 3. **Server Logs**
    - Check application logs in the `logs/app.log` file for detailed error information
    - PHP errors will be logged to the server's error log if app-level logging fails 
+
+# Security Features
+
+The DiaX API implements several security features to protect user data and prevent unauthorized access:
+
+## Authentication Security
+
+### JWT Token Security
+- **Token Fingerprinting**: Each token is fingerprinted with the user's IP address and user agent to prevent token theft and session hijacking
+- **Token Expiration**: Tokens automatically expire after a configurable time period (default: 1 hour)
+- **JWT IDs**: Each token contains a unique identifier (jti claim) to prevent token replays
+- **Issuer & Audience Validation**: Tokens are validated against the issuer and audience claims
+- **Token Revocation**: When a user logs out, their token is added to a blocklist to prevent reuse
+
+### Account Protection
+- **Brute Force Protection**: After multiple failed login attempts, accounts are temporarily locked
+- **Progressive Lockout**: The lockout duration increases exponentially with repeated failures
+- **Consistent Error Messages**: Login errors use consistent messages to prevent user enumeration
+- **Login Logging**: All login attempts (successful and failed) are logged with IP and user agent information
+
+## API Security
+
+### Request Rate Limiting
+- **Tiered Rate Limiting**: Different rate limits for different endpoint types
+- **Authentication Endpoints**: Stricter limits on authentication endpoints (10 requests per 5 minutes)
+- **Standard Endpoints**: Standard limits for regular API use (60 requests per minute)
+- **Retry Headers**: When limits are exceeded, responses include Retry-After headers
+
+### CORS Protection
+- **Origin Restriction**: API restricts allowed origins to specific domains
+- **Credentials Support**: Properly handles credentials in cross-origin requests
+- **Preflight Handling**: OPTIONS requests are handled with appropriate headers
+- **Vary Header**: Includes Vary: Origin header for proper caching
+
+### Other Security Measures
+- **Security Headers**: All responses include security headers:
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: DENY
+  - X-XSS-Protection: 1; mode=block
+  - Referrer-Policy: strict-origin-when-cross-origin
+  - Content-Security-Policy: default-src 'self'
+  - Strict-Transport-Security: max-age=31536000
+
+- **Input Validation**: All API inputs are validated and sanitized
+- **Parameterized Queries**: Database queries use parameterized statements to prevent SQL injection
+- **HTTPS Only**: All API communication should use HTTPS in production
+
+## Email System
+
+The DiaX API includes an integrated email system that sends automated emails for various user actions and events.
+
+### Email Functionality
+
+- **Welcome Emails**: Sent when a user registers for an account
+- **Password Reset Emails**: Sent when a user requests a password reset
+- **Reset Confirmation Emails**: Sent after a successful password reset
+
+### Email Configuration
+
+To configure the email system, add the following environment variables to your `.env` file:
+
+```
+# Email Settings
+MAIL_PROVIDER=smtp  # Options: smtp, sendgrid, mailgun, php_mail
+MAIL_FROM_NAME=DiaX
+MAIL_FROM_EMAIL=noreply@diax.app
+MAIL_CC_EMAIL=  # Optional CC recipient for all emails
+MAIL_BCC_EMAIL=  # Optional BCC recipient for all emails
+FRONTEND_URL=https://diax.fileish.com  # Used for email links
+
+# SendGrid Mail Settings (if using SendGrid)
+SENDGRID_API_KEY=your_sendgrid_api_key
+
+# Mailgun Mail Settings (if using Mailgun)
+MAILGUN_API_KEY=your_mailgun_api_key
+MAILGUN_DOMAIN=your_mailgun_domain.com
+
+# SMTP Mail Settings (if using SMTP)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=your_smtp_username
+SMTP_PASSWORD=your_smtp_password
+SMTP_ENCRYPTION=tls  # tls or ssl
+```
+
+### Email Providers
+
+The system supports four email delivery methods:
+
+1. **SMTP** (`MAIL_PROVIDER=smtp`): Uses a configured SMTP server to send emails
+2. **PHP Mail** (`MAIL_PROVIDER=php_mail`): Uses PHP's built-in mail() function - ideal for shared hosting
+3. **SendGrid** (`MAIL_PROVIDER=sendgrid`): Commercial email service with high deliverability
+4. **Mailgun** (`MAIL_PROVIDER=mailgun`): Commercial email service with generous free tier
+
+The PHP mail() function is optimized for basic email sending on standard hosting environments and requires no additional credentials beyond the FROM settings.
+
+### Email Templates
+
+The system uses HTML email templates with the following variables:
+
+1. **Welcome Email**:
+   - `{{name}}`: User's name
+   - `{{appName}}`: Application name
+   - `{{year}}`: Current year
+   - Contains a link to the dashboard and overview of features
+
+2. **Password Reset Email**:
+   - `{{resetUrl}}`: Complete URL with token to reset password
+   - `{{token}}`: The reset token
+   - `{{expiryHours}}`: Hours until token expiration
+   - `{{appName}}`: Application name
+   - `{{year}}`: Current year
+
+3. **Password Reset Confirmation Email**:
+   - `{{loginUrl}}`: URL to the login page
+   - `{{appName}}`: Application name
+   - `{{year}}`: Current year
+
+### Development Mode
+
+In development mode, emails are not sent but instead:
+- Logged to the server console
+- Saved as HTML files in the `logs/emails` directory
+- Password reset tokens are logged to the console
+
+### Email Security
+
+The email system implements several security features:
+- Password reset tokens are cryptographically secure random values
+- Tokens are stored as hashed values in the database
+- Tokens expire after 1 hour
+- Generic responses for forgot password to prevent user enumeration
+- Only one valid reset token per user at a time

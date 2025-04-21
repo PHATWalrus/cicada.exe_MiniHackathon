@@ -8,16 +8,23 @@ use DiaX\Controllers\HealthMetricController;
 use DiaX\Controllers\AdminController;
 use DiaX\Middleware\JwtAuthMiddleware;
 use DiaX\Middleware\AdminAuthMiddleware;
+use DiaX\Middleware\RateLimitMiddleware;
 use Slim\Routing\RouteCollectorProxy;
 
+// Create rate limiters with different configurations
+$authRateLimiter = new RateLimitMiddleware(10, 5, 'auth:'); // 10 requests per 5 minutes for auth
+$apiRateLimiter = new RateLimitMiddleware(60, 1, 'api:'); // 60 requests per minute for standard API
+
 // Public routes
-$app->group('/api', function (RouteCollectorProxy $group) {
-    // Auth routes
+$app->group('/api', function (RouteCollectorProxy $group) use ($authRateLimiter) {
+    // Auth routes (with stricter rate limiting)
     $group->group('/auth', function (RouteCollectorProxy $group) {
         $group->post('/register', [AuthController::class, 'register']);
         $group->post('/login', [AuthController::class, 'login']);
         $group->post('/refresh', [AuthController::class, 'refresh']);
-    });
+        $group->post('/forgot-password', [AuthController::class, 'forgotPassword']);
+        $group->post('/reset-password', [AuthController::class, 'resetPassword']);
+    })->add($authRateLimiter); // Apply stricter rate limiting to auth endpoints
 
     // Resources (public)
     $group->get('/resources', [ResourceController::class, 'getPublicResources']);
@@ -34,11 +41,11 @@ $app->group('/api', function (RouteCollectorProxy $group) {
 });
 
 // Protected routes
-$app->group('/api', function (RouteCollectorProxy $group) {
+$app->group('/api', function (RouteCollectorProxy $group) use ($authRateLimiter) {
     // Auth routes requiring authentication
     $group->group('/auth', function (RouteCollectorProxy $group) {
         $group->post('/logout', [AuthController::class, 'logout']);
-    });
+    })->add($authRateLimiter); // Apply stricter rate limiting to auth endpoints
     
     // User routes
     $group->group('/users', function (RouteCollectorProxy $group) {

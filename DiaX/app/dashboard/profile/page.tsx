@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fetchUserProfile, updateUserProfile } from "@/lib/api"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { toastService } from "@/lib/toast-service"
 import Link from "next/link"
 
 export default function ProfilePage() {
@@ -87,6 +88,9 @@ export default function ProfilePage() {
     try {
       await updateUserProfile(changedData)
       setSuccess("Profile updated successfully")
+
+      // Show toast notification
+      toastService.profileUpdated()
 
       // Update the original data with the new values
       setOriginalData({ ...originalData, ...changedData })

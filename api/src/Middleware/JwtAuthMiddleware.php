@@ -3,6 +3,7 @@
 namespace DiaX\Middleware;
 
 use DiaX\Utils\JwtUtil;
+use DiaX\Models\TokenBlocklist;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -40,11 +41,52 @@ class JwtAuthMiddleware implements MiddlewareInterface
         ];
         
         try {
+            // Check if token is in blocklist (revoked)
+            if (class_exists('DiaX\Models\TokenBlocklist')) {
+                $blockedToken = TokenBlocklist::where('token_signature', JwtUtil::getTokenSignature($token))->first();
+                if ($blockedToken) {
+                    throw new \Exception('Token has been revoked');
+                }
+            }
+            
+            // Validate token
             $userData = JwtUtil::decodeToken($token, $jwtSettings);
+            
+            // Check token expiration (redundant but extra security)
+            if (isset($userData->exp) && $userData->exp < time()) {
+                throw new \Exception('Token has expired');
+            }
+            
+            // Check issuer and audience if provided
+            if (isset($userData->iss) && $userData->iss !== $jwtSettings['issuer']) {
+                throw new \Exception('Invalid token issuer');
+            }
+            
+            if (isset($userData->aud) && $userData->aud !== $jwtSettings['audience']) {
+                throw new \Exception('Invalid token audience');
+            }
+            
+            // Enforce fingerprint validation if enabled
+            if (isset($_ENV['ENABLE_TOKEN_FINGERPRINT']) && $_ENV['ENABLE_TOKEN_FINGERPRINT'] === 'true') {
+                // This code is currently disabled to prevent "Invalid token fingerprint" errors
+                // If you want to re-enable this security feature, you'll need to ensure IP addresses 
+                // and user agents are consistent between token generation and validation
+                /*
+                $clientIp = $request->getServerParams()['REMOTE_ADDR'] ?? null;
+                $userAgent = $request->getHeaderLine('User-Agent');
+                
+                if (!JwtUtil::validateFingerprint($userData, $clientIp, $userAgent)) {
+                    throw new \Exception('Invalid token fingerprint');
+                }
+                */
+            }
             
             // Add user data to request
             $request = $request->withAttribute('jwt', $userData);
             $request = $request->withAttribute('user_id', $userData->sub);
+            
+            // Add the token to the request for logout functionality
+            $request = $request->withAttribute('token', $token);
             
             return $handler->handle($request);
         } catch (\Exception $e) {

@@ -16,8 +16,11 @@ class AppContainer
     {
         $containerBuilder = new ContainerBuilder();
         
+        // Load service definitions from dependencies.php
+        $dependencies = require __DIR__ . '/dependencies.php';
+        
         // Set up definitions
-        $containerBuilder->addDefinitions([
+        $containerDefinitions = [
             // Database
             Capsule::class => function () {
                 $capsule = new Capsule;
@@ -43,18 +46,9 @@ class AppContainer
                 return $capsule;
             },
             
-            // Logger
+            // Logger interface
             LoggerInterface::class => function (ContainerInterface $container) {
-                $logger = new Logger('app');
-                $logFile = __DIR__ . '/../../logs/app.log';
-                
-                // Create logs directory if it doesn't exist
-                if (!is_dir(dirname($logFile))) {
-                    mkdir(dirname($logFile), 0777, true);
-                }
-                
-                $logger->pushHandler(new StreamHandler($logFile, Logger::DEBUG));
-                return $logger;
+                return $container->get(Logger::class);
             },
             
             // Settings
@@ -75,8 +69,33 @@ class AppContainer
                     'api_key' => $_ENV['PERPLEXITY_API_KEY'],
                     'model' => $_ENV['PERPLEXITY_MODEL'],
                 ],
+                'email' => [
+                    'provider' => $_ENV['MAIL_PROVIDER'] ?? 'smtp', // Options: smtp, sendgrid, mailgun, php_mail
+                    'from_name' => $_ENV['MAIL_FROM_NAME'] ?? 'DiaX',
+                    'from_email' => $_ENV['MAIL_FROM_EMAIL'] ?? 'noreply@diax.app',
+                    'environment' => $_ENV['APP_ENV'] ?? 'production',
+                    'app_name' => 'DiaX',
+                    'frontend_url' => $_ENV['FRONTEND_URL'] ?? 'https://diax.fileish.com',
+                    // Additional email settings
+                    'cc_email' => $_ENV['MAIL_CC_EMAIL'] ?? '',
+                    'bcc_email' => $_ENV['MAIL_BCC_EMAIL'] ?? '',
+                    // SendGrid specific settings
+                    'sendgrid_api_key' => $_ENV['SENDGRID_API_KEY'] ?? '',
+                    // Mailgun specific settings
+                    'mailgun_api_key' => $_ENV['MAILGUN_API_KEY'] ?? '',
+                    'mailgun_domain' => $_ENV['MAILGUN_DOMAIN'] ?? '',
+                    // SMTP settings
+                    'smtp_host' => $_ENV['SMTP_HOST'] ?? 'localhost',
+                    'smtp_port' => $_ENV['SMTP_PORT'] ?? 25,
+                    'smtp_username' => $_ENV['SMTP_USERNAME'] ?? '',
+                    'smtp_password' => $_ENV['SMTP_PASSWORD'] ?? '',
+                    'smtp_encryption' => $_ENV['SMTP_ENCRYPTION'] ?? '', // tls or ssl
+                ],
             ],
-        ]);
+        ];
+        
+        // Merge container definitions with dependencies
+        $containerBuilder->addDefinitions(array_merge($containerDefinitions, $dependencies));
         
         return $containerBuilder->build();
     }

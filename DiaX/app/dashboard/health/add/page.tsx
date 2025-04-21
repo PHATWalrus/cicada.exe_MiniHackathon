@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { addHealthMetric, fetchMedicalInfo } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { toastService } from "@/lib/toast-service"
 import {
   Droplet,
   Activity,
@@ -24,6 +25,7 @@ import {
   HelpCircle,
   ChevronUp,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react"
 import Link from "next/link"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -183,6 +185,7 @@ export default function AddHealthMetrics() {
 
       // Submit each metric that has data
       const submissionPromises = []
+      const submittedMetrics = []
 
       if (hasBloodGlucose) {
         const bloodGlucoseData = {
@@ -191,7 +194,8 @@ export default function AddHealthMetrics() {
           blood_glucose_level: Number.parseFloat(formData.blood_glucose_level),
           measurement_context: formData.measurement_context,
         }
-        submissionPromises.push(addHealthMetric(bloodGlucoseData))
+        submissionPromises.push(addHealthMetric(bloodGlucoseData, true)) // Suppress individual toasts
+        submittedMetrics.push("blood glucose")
       }
 
       if (hasBloodPressure) {
@@ -201,7 +205,8 @@ export default function AddHealthMetrics() {
           systolic_pressure: Number.parseInt(formData.systolic_pressure),
           diastolic_pressure: Number.parseInt(formData.diastolic_pressure),
         }
-        submissionPromises.push(addHealthMetric(bloodPressureData))
+        submissionPromises.push(addHealthMetric(bloodPressureData, true)) // Suppress individual toasts
+        submittedMetrics.push("blood pressure")
       }
 
       if (hasHeartRate) {
@@ -210,7 +215,8 @@ export default function AddHealthMetrics() {
           notes: formData.notes,
           heart_rate: Number.parseInt(formData.heart_rate),
         }
-        submissionPromises.push(addHealthMetric(heartRateData))
+        submissionPromises.push(addHealthMetric(heartRateData, true)) // Suppress individual toasts
+        submittedMetrics.push("heart rate")
       }
 
       if (hasWeight) {
@@ -219,7 +225,8 @@ export default function AddHealthMetrics() {
           notes: formData.notes,
           weight_kg: Number.parseFloat(formData.weight_kg),
         }
-        submissionPromises.push(addHealthMetric(weightData))
+        submissionPromises.push(addHealthMetric(weightData, true)) // Suppress individual toasts
+        submittedMetrics.push("weight")
       }
 
       if (hasA1C) {
@@ -228,7 +235,8 @@ export default function AddHealthMetrics() {
           notes: formData.notes,
           a1c_percentage: Number.parseFloat(formData.a1c_percentage),
         }
-        submissionPromises.push(addHealthMetric(a1cData))
+        submissionPromises.push(addHealthMetric(a1cData, true)) // Suppress individual toasts
+        submittedMetrics.push("A1C")
       }
 
       if (hasExercise) {
@@ -239,27 +247,24 @@ export default function AddHealthMetrics() {
           exercise_type: formData.exercise_type,
           exercise_intensity: Number.parseInt(formData.exercise_intensity),
         }
-        submissionPromises.push(addHealthMetric(exerciseData))
+        submissionPromises.push(addHealthMetric(exerciseData, true)) // Suppress individual toasts
+        submittedMetrics.push("exercise")
       }
 
       // Wait for all submissions to complete
       await Promise.all(submissionPromises)
 
-      toast({
-        title: "Success",
-        description: `Health data submitted successfully`,
-        variant: "default",
-      })
+      // Show a summary toast for all submitted metrics
+      toastService.success(
+        "Data Submitted Successfully",
+        `Your ${submittedMetrics.join(", ")} data has been saved and can be viewed in your health history.`,
+      )
 
       // Reset form
       resetForm()
     } catch (error) {
       console.error("Error adding health metrics:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add health data",
-        variant: "destructive",
-      })
+      toastService.error("Error Submitting Data", error instanceof Error ? error.message : "Failed to add health data")
     } finally {
       setIsSubmitting(false)
     }
@@ -707,7 +712,14 @@ export default function AddHealthMetrics() {
             Reset All
           </Button>
           <Button type="submit" disabled={isSubmitting} className="bg-teal-500 hover:bg-teal-600 w-full md:w-auto">
-            {isSubmitting ? "Submitting..." : "Submit All Data"}
+            {isSubmitting ? (
+              <>
+                <span className="mr-2">Submitting...</span>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              </>
+            ) : (
+              "Submit All Data"
+            )}
           </Button>
         </div>
       </form>

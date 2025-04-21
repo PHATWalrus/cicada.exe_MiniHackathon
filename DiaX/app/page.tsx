@@ -27,11 +27,11 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-screen w-full relative">
       <BeamsBackground />
 
-      <div className="relative z-10">
-        <header className="container mx-auto py-6 flex justify-between items-center">
+      <div className="relative z-10 w-full">
+        <header className="max-w-[1400px] mx-auto py-6 px-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <HeartPulse className="h-8 w-8 text-cyan-400" />
             <span className="text-2xl font-bold text-white">DiaX</span>
@@ -61,7 +61,7 @@ export default function Home() {
           </div>
         </header>
 
-        <main className="container mx-auto py-12">
+        <main className="max-w-[1400px] mx-auto py-12 px-4">
           <div className="flex flex-col items-center text-center mb-16">
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
@@ -179,8 +179,8 @@ export default function Home() {
           </div>
         </main>
 
-        <footer className="bg-slate-900/50 py-12 border-t border-white/10">
-          <div className="container mx-auto">
+        <footer className="bg-slate-900/50 py-12 border-t border-white/10 w-full">
+          <div className="max-w-[1400px] mx-auto px-4">
             <div className="flex items-center justify-center mb-6">
               <HeartPulse className="h-8 w-8 text-cyan-400 mr-2" />
               <span className="text-2xl font-bold text-cyan-400">DiaX</span>

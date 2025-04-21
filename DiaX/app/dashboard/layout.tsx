@@ -13,6 +13,7 @@ import DashboardHeader from "@/components/dashboard-header"
 import ScrollToTop from "@/components/scroll-to-top"
 import { ScrollProgress } from "@/components/scroll-progress"
 import { prefetchMultiplePages } from "@/lib/navigation-manager"
+import { toastService } from "@/lib/toast-service"
 import dynamic from "next/dynamic"
 
 // Use dynamic import for framer-motion to avoid SSR issues
@@ -38,6 +39,25 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
   const isMobile = useMobile()
+
+  // Monitor network status
+  useEffect(() => {
+    const handleOnline = () => {
+      toastService.networkOnline()
+    }
+
+    const handleOffline = () => {
+      toastService.networkOffline()
+    }
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
 
   // Prefetch critical data when dashboard loads
   useEffect(() => {
@@ -78,7 +98,7 @@ export default function DashboardLayout({
   // Show loading indicator only for a short time
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
       </div>
     )
@@ -90,14 +110,16 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen w-full flex flex-col bg-background">
       {/* Header - shown on all devices */}
       <ScrollProgress />
       <DashboardHeader />
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-4 flex-1 dashboard-content">
-        <DynamicPageTransition>{children}</DynamicPageTransition>
+      <div className="w-full flex-1 dashboard-content">
+        <div className="w-[90%] mx-auto">
+          <DynamicPageTransition>{children}</DynamicPageTransition>
+        </div>
       </div>
 
       {/* Quick Add Button - hidden on chat pages */}

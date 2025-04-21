@@ -54,7 +54,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 to-cyan-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-slate-900 to-cyan-900 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md border-0 shadow-xl rounded-2xl overflow-hidden bg-slate-800/30 backdrop-blur-md border-white/10">
         <CardHeader className="space-y-1 bg-gradient-to-r from-cyan-600 to-teal-600 text-white p-8">
           <motion.div

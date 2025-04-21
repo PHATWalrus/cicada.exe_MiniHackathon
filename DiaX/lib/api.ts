@@ -1,6 +1,7 @@
 // API utility functions for DiaX
 import { CACHE_KEYS, cacheManager } from "./cache-manager"
 import { mutate } from "swr"
+import { toastService } from "./toast-service"
 
 // Get the authentication token
 export function getToken() {
@@ -93,6 +94,7 @@ export async function fetchUserProfile() {
     return data
   } catch (error) {
     console.error("Error fetching user profile:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -117,9 +119,13 @@ export async function updateUserProfile(userData: any) {
     // Invalidate profile caches
     cacheManager.invalidateProfileCaches()
 
+    // Show success toast
+    toastService.profileUpdated()
+
     return data
   } catch (error) {
     console.error("Error updating user profile:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -147,6 +153,7 @@ export async function fetchMedicalInfo() {
     return data
   } catch (error) {
     console.error("Error fetching medical info:", error)
+    // Don't show toast for this one as it's often called in the background
     throw error
   }
 }
@@ -176,9 +183,13 @@ export async function updateMedicalInfo(medicalData: any) {
       CACHE_KEYS.HEALTH_STATS(90),
     ])
 
+    // Show success toast
+    toastService.medicalInfoUpdated()
+
     return data
   } catch (error) {
     console.error("Error updating medical info:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -206,9 +217,13 @@ export async function deleteMedicalRecord() {
       CACHE_KEYS.HEALTH_STATS(90),
     ])
 
+    // Show success toast
+    toastService.info("Medical Record Deleted", "Your medical record has been successfully deleted.")
+
     return data
   } catch (error) {
     console.error("Error deleting medical record:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -255,11 +270,12 @@ export async function fetchHealthMetrics(params?: {
     return data
   } catch (error) {
     console.error("Error fetching health metrics:", error)
+    toastService.apiError(error)
     throw error
   }
 }
 
-export async function addHealthMetric(metricData: any) {
+export async function addHealthMetric(metricData: any, suppressToast = false) {
   try {
     const response = await fetchWithTimeout(
       "https://diax.fileish.com/api/health/metrics",
@@ -279,9 +295,32 @@ export async function addHealthMetric(metricData: any) {
     // Invalidate health caches
     cacheManager.invalidateHealthCaches()
 
+    // Only show toast if not suppressed
+    if (!suppressToast) {
+      // Determine metric type for toast message
+      let metricType = "health"
+      if (metricData.blood_glucose_level !== undefined) {
+        metricType = "blood glucose"
+      } else if (metricData.systolic_pressure !== undefined) {
+        metricType = "blood pressure"
+      } else if (metricData.heart_rate !== undefined && metricData.exercise_duration === undefined) {
+        metricType = "heart rate"
+      } else if (metricData.weight_kg !== undefined) {
+        metricType = "weight"
+      } else if (metricData.a1c_percentage !== undefined) {
+        metricType = "A1C"
+      } else if (metricData.exercise_duration !== undefined) {
+        metricType = "exercise"
+      }
+
+      // Show success toast
+      toastService.healthDataAdded(metricType)
+    }
+
     return data
   } catch (error) {
     console.error("Error adding health metric:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -306,9 +345,29 @@ export async function updateHealthMetric(id: number, metricData: any) {
     // Invalidate health caches
     cacheManager.invalidateHealthCaches()
 
+    // Determine metric type for toast message
+    let metricType = "health"
+    if (metricData.blood_glucose_level !== undefined) {
+      metricType = "blood glucose"
+    } else if (metricData.systolic_pressure !== undefined) {
+      metricType = "blood pressure"
+    } else if (metricData.heart_rate !== undefined && metricData.exercise_duration === undefined) {
+      metricType = "heart rate"
+    } else if (metricData.weight_kg !== undefined) {
+      metricType = "weight"
+    } else if (metricData.a1c_percentage !== undefined) {
+      metricType = "A1C"
+    } else if (metricData.exercise_duration !== undefined) {
+      metricType = "exercise"
+    }
+
+    // Show success toast
+    toastService.healthDataUpdated(metricType)
+
     return data
   } catch (error) {
     console.error("Error updating health metric:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -331,9 +390,13 @@ export async function deleteHealthMetric(id: number) {
     // Invalidate health caches
     cacheManager.invalidateHealthCaches()
 
+    // Show success toast
+    toastService.healthDataDeleted()
+
     return data
   } catch (error) {
     console.error("Error deleting health metric:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -362,6 +425,7 @@ export async function fetchHealthStats(days?: number) {
     return data
   } catch (error) {
     console.error("Error fetching health stats:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -406,6 +470,7 @@ export async function fetchHealthChartData(params?: {
     return data
   } catch (error) {
     console.error("Error fetching health chart data:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -449,6 +514,7 @@ export async function fetchHealthDistribution(params?: {
     return data
   } catch (error) {
     console.error("Error fetching health distribution data:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -490,6 +556,7 @@ export async function sendChatMessage(message: string, sessionId?: number | null
 
     // For other errors, provide more context
     console.error("Error sending chat message:", error)
+    toastService.apiError(error)
     throw new Error(error instanceof Error ? error.message : "Failed to send message. Please check your connection.")
   }
 }
@@ -510,6 +577,7 @@ export async function getChatSessions() {
     return data
   } catch (error) {
     console.error("Error fetching chat sessions:", error)
+    toastService.apiError(error)
     throw new Error(error instanceof Error ? error.message : "Failed to load chat sessions")
   }
 }
@@ -530,6 +598,7 @@ export async function getChatSessionDetails(sessionId: number) {
     return data
   } catch (error) {
     console.error(`Error fetching session ${sessionId} details:`, error)
+    toastService.apiError(error)
     throw new Error(error instanceof Error ? error.message : "Failed to load session details")
   }
 }
@@ -560,6 +629,7 @@ export async function fetchResources(category?: string) {
     return data
   } catch (error) {
     console.error("Error fetching resources:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -584,9 +654,13 @@ export async function saveResource(resourceData: any) {
     // Invalidate resources cache
     cacheManager.invalidateCache(CACHE_KEYS.RESOURCES())
 
+    // Show success toast
+    toastService.success("Resource Saved", "Your resource has been submitted and is pending approval.")
+
     return data
   } catch (error) {
     console.error("Error saving resource:", error)
+    toastService.apiError(error)
     throw error
   }
 }
@@ -620,6 +694,68 @@ export async function checkApiHealth() {
     return handleResponse(response)
   } catch (error) {
     console.error("API health check failed:", error)
+    throw error
+  }
+}
+
+// Request password reset
+export async function requestPasswordReset(email: string) {
+  try {
+    const response = await fetchWithTimeout(
+      "https://diax.fileish.com/api/auth/forgot-password",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      },
+      10000,
+    )
+
+    const data = await handleResponse(response)
+
+    // Show success toast
+    toastService.success(
+      "Password Reset Email Sent",
+      "If the email address exists in our system, a password reset link has been sent.",
+    )
+
+    return data
+  } catch (error) {
+    console.error("Error requesting password reset:", error)
+    toastService.apiError(error)
+    throw error
+  }
+}
+
+// Reset password with token
+export async function resetPassword(token: string, password: string, password_confirmation: string) {
+  try {
+    const response = await fetchWithTimeout(
+      "https://diax.fileish.com/api/auth/reset-password",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token, password, password_confirmation }),
+      },
+      10000,
+    )
+
+    const data = await handleResponse(response)
+
+    // Show success toast
+    toastService.success(
+      "Password Reset Successful",
+      "Your password has been reset successfully. You can now log in with your new password.",
+    )
+
+    return data
+  } catch (error) {
+    console.error("Error resetting password:", error)
+    toastService.apiError(error)
     throw error
   }
 }

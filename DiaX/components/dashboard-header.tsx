@@ -47,7 +47,7 @@ export default function DashboardHeader() {
           scrolled ? "shadow-md" : "shadow-sm",
         )}
       >
-        <div className="container mx-auto px-4">
+        <div className="w-[90%] mx-auto">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <div className="flex items-center gap-2">

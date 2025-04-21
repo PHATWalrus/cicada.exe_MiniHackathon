@@ -32,6 +32,7 @@ class User extends Model
     protected $hidden = [
         'password',
         'reset_token',
+        'reset_token_expires_at',
     ];
 
     /**

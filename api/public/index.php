@@ -4,6 +4,7 @@ use DiaX\Config\AppContainer;
 use Slim\Factory\AppFactory;
 use Slim\Exception\HttpNotFoundException;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use DiaX\Middleware\RateLimitMiddleware;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -21,6 +22,18 @@ $container->get(Capsule::class);
 AppFactory::setContainer($container);
 $app = AppFactory::create();
 
+// Add security headers to all responses
+$app->add(function ($request, $handler) {
+    $response = $handler->handle($request);
+    
+    return $response
+        ->withHeader('X-Content-Type-Options', 'nosniff')
+        ->withHeader('X-Frame-Options', 'DENY')
+        ->withHeader('X-XSS-Protection', '1; mode=block')
+        ->withHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+        ->withHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';");
+});
+
 // Add error middleware
 $app->addErrorMiddleware($_ENV['APP_DEBUG'] === 'true', true, true);
 
@@ -30,7 +43,11 @@ $app->addRoutingMiddleware();
 // Add body parsing middleware
 $app->addBodyParsingMiddleware();
 
-// Add middleware
+// Create rate limiters
+$authRateLimiter = new RateLimitMiddleware(10, 5, 'auth:'); // 10 requests per 5 minutes for auth
+$standardRateLimiter = new RateLimitMiddleware(600, 1, 'api:'); // 60 requests per minute for API
+
+// Add CORS middleware
 $app->add(new \DiaX\Middleware\CorsMiddleware());
 
 // Register routes
